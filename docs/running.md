@@ -54,6 +54,21 @@ and `build/data/*` as `DATA\`. Then `DOSBENCH`:
   batch file runs each program on its own and returns to the menu;
 - V shows `OUT\RESULTS.TXT`: the latest figures per test, mode and program.
 
+## A machine to try it by hand
+
+```
+python3 tools/run.py winvm --card g450      # dist/dosbench-g450-vm.zip
+```
+
+A ready-to-boot 86Box machine (Loop A's: Pentium II 350, the emulated card
+plus a Voodoo Graphics, Sound Blaster 16, FreeDOS) with DOSBench and its
+menu in `C:\DOSBENCH`, DOS-GL's demos in `C:\DOSGL` and ClassiCube in
+`C:\CC`; its `README.txt` lists them. It needs MGA-Glide's patched 86Box:
+on Linux the one `make 86box` builds, on Windows the one MGA-Glide's
+Windows kit builds (`tools/86box/mkwinkit.sh`, then `build-windows.sh` in
+MSYS2). The zip holds the converted scenes, including the Stanford scans:
+keep it to yourself.
+
 ## Loop A (86Box): correctness
 
 ```

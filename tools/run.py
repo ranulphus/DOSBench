@@ -17,6 +17,11 @@
       on a real PC; results land in MGA-Glide's out/bench/<pc>/<job>/files/.
       --install-data first copies the scenes to C:\\DOSBENCH\\DATA (once per PC).
 
+  run.py winvm [--card g450]
+      A ready-to-boot 86Box machine (dist/dosbench-<card>-vm.zip) with DOSBench,
+      DOS-GL's demos and ClassiCube, for MGA-Glide's patched 86Box, including
+      its Windows build (MGA-Glide tools/86box/windows/).
+
   run.py compare DIR [DIR...]
       Re-run the image checks on existing Loop A output directories.
 
@@ -28,6 +33,7 @@ import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -282,6 +288,70 @@ def cmd_bench(a):
     return rc
 
 
+WINVM_NOTES = """What is on C:
+  C:\\DOSBENCH   DOSBench. Type DOSBENCH for the menu (it starts in this directory):
+                pick APIs, modes and tests, R runs them, V shows the results.
+                BENCHGL.EXE is OpenGL on DOS-GL, BENCHG.EXE Glide on MGA-Glide's
+                GLIDE2X.OVL (this directory). The scenes are in DATA; see
+                DATA\\CREDITS.TXT (the Stanford scans are for research use: this is
+                a private copy, do not pass it on).
+  C:\\DOSGL      DOS-GL demos: TRI, CUBE, TEXCUBE (add --frames 600 to watch
+                longer), PROBE (what the library found), CLEAR.
+  C:\\CC         ClassiCube on DOS-GL, with a procedural test texture pack:
+                CD \\CC, then CCDOS --singleplayer (Esc, then Quit to leave).
+  C:\\HX         DOS4GW.EXE, CWSDPMI.EXE and small helpers (on PATH).
+
+Timings inside 86Box describe the emulator, not the hardware.
+The Glide programs use MGA-Glide on the Matrox card. To see 3dfx's own
+runtime on the emulated Voodoo, copy a retail GLIDE2X.OVL of your own in
+and run BENCHG --glide=THATFILE (it is not included).
+"""
+
+
+def cmd_winvm(a):
+    """A ready-to-boot 86Box machine with DOSBench, DOS-GL's demos and
+    ClassiCube, for MGA-Glide's patched 86Box (Windows kit or Linux)."""
+    dosgl = VARS["DOSGL"]
+    name = "dosbench-" + a.card
+    files = ["%s=/DOSBENCH/%s" % (os.path.join(ROOT, "build/dos", f), f)
+             for f in ("BENCHG.EXE", "BENCHGL.EXE", "DBMENU.EXE")]
+    files += ["%s=/DOSBENCH/DOSBENCH.BAT" % os.path.join(ROOT, "dos/DOSBENCH.BAT"),
+              "%s=/DOSBENCH/GLIDE2X.OVL" % os.path.join(MGA, "build/ow/GLIDE2X.OVL")]
+    for f in data_files() + [os.path.join(ROOT, "build/data/CREDITS.TXT")]:
+        if os.path.exists(f):
+            files.append("%s=/DOSBENCH/DATA/%s" % (f, os.path.basename(f).upper()))
+    for f in ("TRI", "CUBE", "TEXCUBE", "PROBE", "CLEAR"):
+        p = os.path.join(dosgl, "build/exe/%s.EXE" % f)
+        if os.path.exists(p):
+            files.append("%s=/DOSGL/%s.EXE" % (p, f))
+    cc = os.path.join(dosgl, "build/cc/CCDOS.EXE")
+    if os.path.exists(cc):
+        files += ["%s=/CC/CCDOS.EXE" % cc,
+                  "%s=/CC/TEXPACKS/DEFAULT.ZIP" % os.path.join(dosgl, "build/cc/default.zip")]
+    # The dev container mounts MGA-Glide and this repository only: stage the rest here.
+    stage = os.path.join(ROOT, "build", "winvm")
+    shutil.rmtree(stage, ignore_errors=True)
+    os.makedirs(stage)
+    staged = []
+    for i, spec in enumerate(files):
+        src, dst = spec.split("=", 1)
+        if not os.path.abspath(src).startswith((ROOT + os.sep, MGA + os.sep)):
+            copy = os.path.join(stage, "%02d-%s" % (i, os.path.basename(src)))
+            shutil.copyfile(src, copy)
+            src = copy
+        staged.append("%s=%s" % (src, dst))
+    files = staged
+    notes = os.path.join(ROOT, "build", "winvm-notes.txt")
+    open(notes, "w").write(WINVM_NOTES)
+    out = os.path.join(ROOT, "dist", name + "-vm.zip")
+    cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "86box", "mkwinvm.py"),
+           "--name", name, "--card", a.card, "--readme", notes, "--out", out,
+           "--run", "CD \\DOSBENCH", "--run", "ECHO DOSBench: type DOSBENCH for the menu (README.txt has the rest)."]
+    for f in files:
+        cmd += ["--file", f]
+    return subprocess.run(cmd, cwd=ROOT).returncode
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="what", required=True)
@@ -304,8 +374,10 @@ def main():
     p.add_argument("--secs", default="5", help="target seconds per timed test")
     p.add_argument("--install-data", action="store_true", help="copy the scenes to C:\\DOSBENCH\\DATA (once per PC)")
     p.add_argument("--timeout", type=int, default=3600)
+    p = sub.add_parser("winvm")
+    p.add_argument("--card", default="g450", choices=["g100", "g200", "g400", "g450"])
     a = ap.parse_args()
-    return {"loopa": cmd_loopa, "compare": cmd_compare, "bench": cmd_bench}[a.what](a)
+    return {"loopa": cmd_loopa, "compare": cmd_compare, "bench": cmd_bench, "winvm": cmd_winvm}[a.what](a)
 
 
 if __name__ == "__main__":
