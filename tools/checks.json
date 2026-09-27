@@ -1,0 +1,8 @@
+{
+ "_about": "Frame-check tolerances for tools/run.py (MGA-Glide's tools/imgcmp.py options: tol per channel after RGB565 quantisation, frac of pixels allowed beyond it, edge ignores colour edges of the reference). Per kind, then per test.",
+ "default": {"tol": 24, "frac": 0.005, "edge": true},
+ "glide-vs-voodoo": {"default": {}},
+ "gl-across-cards": {"default": {}},
+ "glide-across-cards": {"default": {}},
+ "gl-vs-glide": {"default": {"advisory": true}}
+}
