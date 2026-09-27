@@ -267,12 +267,12 @@ def bars(test, label, values, width=520):
     if not vals:
         return ""
     top = max(v for _, v in vals) or 1
-    rowh, left = 18, 64
-    h = rowh * len(values) + 8
+    rowh, left, top_pad = 18, 8, 18
+    h = rowh * len(values) + 8 + top_pad
     out = ['<svg viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx" role="img" aria-label="%s">' %
            (width, h, width, html.escape("%s %s" % (test, label)))]
     for i, v in enumerate(values):
-        y = 4 + i * rowh
+        y = top_pad + 4 + i * rowh
         if v is None:
             out.append('<text x="%d" y="%d" class="muted">n/a</text>' % (left, y + 12))
             continue
