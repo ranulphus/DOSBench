@@ -17,7 +17,7 @@
       on a real PC; results land in MGA-Glide's out/bench/<pc>/<job>/files/.
       --install-data first copies the scenes to C:\\DOSBENCH\\DATA (once per PC).
 
-  run.py winvm [--card g450]
+  run.py winvm [--card g450] [--games]
       A ready-to-boot 86Box machine (dist/dosbench-<card>-vm.zip) with DOSBench,
       DOS-GL's demos and ClassiCube, for MGA-Glide's patched 86Box, including
       its Windows build (MGA-Glide tools/86box/windows/).
@@ -312,7 +312,7 @@ def cmd_winvm(a):
     """A ready-to-boot 86Box machine with DOSBench, DOS-GL's demos and
     ClassiCube, for MGA-Glide's patched 86Box (Windows kit or Linux)."""
     dosgl = VARS["DOSGL"]
-    name = "dosbench-" + a.card
+    name = "dosbench-" + a.card + ("-games" if a.games else "")
     files = ["%s=/DOSBENCH/%s" % (os.path.join(ROOT, "build/dos", f), f)
              for f in ("BENCHG.EXE", "BENCHGL.EXE", "DBMENU.EXE")]
     files += ["%s=/DOSBENCH/DOSBENCH.BAT" % os.path.join(ROOT, "dos/DOSBENCH.BAT"),
@@ -349,6 +349,9 @@ def cmd_winvm(a):
            "--run", "CD \\DOSBENCH", "--run", "ECHO DOSBench: type DOSBENCH for the menu (README.txt has the rest)."]
     for f in files:
         cmd += ["--file", f]
+    if a.games:
+        # Retail games from MGA-Glide's local fixtures: this zip is for the owner's machine only.
+        cmd += ["--game", "gta", "--game", "sr", "--mga-ovl", os.path.join(MGA, "build/ow/GLIDE2X.OVL")]
     return subprocess.run(cmd, cwd=ROOT).returncode
 
 
@@ -376,6 +379,8 @@ def main():
     p.add_argument("--timeout", type=int, default=3600)
     p = sub.add_parser("winvm")
     p.add_argument("--card", default="g450", choices=["g100", "g200", "g400", "g450"])
+    p.add_argument("--games", action="store_true",
+                   help="also install GTA and Screamer Rally from MGA-Glide's local fixtures (private zip)")
     a = ap.parse_args()
     return {"loopa": cmd_loopa, "compare": cmd_compare, "bench": cmd_bench, "winvm": cmd_winvm}[a.what](a)
 

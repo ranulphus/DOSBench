@@ -58,6 +58,7 @@ and `build/data/*` as `DATA\`. Then `DOSBENCH`:
 
 ```
 python3 tools/run.py winvm --card g450      # dist/dosbench-g450-vm.zip
+python3 tools/run.py winvm --card g450 --games   # dist/dosbench-g450-games-vm.zip
 ```
 
 A ready-to-boot 86Box machine (Loop A's: Pentium II 350, the emulated card
@@ -68,6 +69,12 @@ on Linux the one `make 86box` builds, on Windows the one MGA-Glide's
 Windows kit builds (`tools/86box/mkwinkit.sh`, then `build-windows.sh` in
 MSYS2). The zip holds the converted scenes, including the Stanford scans:
 keep it to yourself.
+
+`--games` also installs GTA and Screamer Rally from MGA-Glide's local game
+fixtures into `C:\GAMES`, with launchers: `GTA` and `SR` run them on
+MGA-Glide on the Matrox card, `GTA 3DFX` and `SR 3DFX` on 3dfx's runtime on
+the Voodoo. That zip holds retail games: it is only for their owner's
+machine.
 
 ## Loop A (86Box): correctness
 
