@@ -375,6 +375,68 @@ static void tex_frame(tctx *t, int f)
     rb_tex_bind(NULL);
 }
 
+/* ---- S3SUB: sub-image updates -------------------------------------------
+ * A 128x128 texture (a lightmap page) drawn as 16 quads, with its 16 32x32
+ * rectangles replaced every frame. param 0: all rectangles replaced, then
+ * all quads drawn (GLQuake's lightmaps); param 1: each rectangle replaced
+ * just before its quad is drawn (Quake 2 refilling one dynamic lightmap). */
+static int sub_setup(tctx *t)
+{
+    static const uint32_t white[4] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
+    synth *s = alloc_synth(t);
+    int i, k;
+    if (!s)
+        return -1;
+    s->v = (rb_vertex *)calloc(16 * 4, sizeof *s->v);
+    s->idx = (uint16_t *)calloc(6, sizeof *s->idx);
+    s->img[0] = (uint8_t *)malloc(32 * 32 * 4 * 16);       /* 16 rectangles, two looks */
+    s->img[1] = (uint8_t *)malloc(32 * 32 * 4 * 16);
+    if (!s->v || !s->idx || !s->img[0] || !s->img[1] || !make_tex(s, 128, 0, 30, RB_TF_CLAMP))
+        return -1;
+    for (i = 0; i < 16; i++) {
+        float x = 16.0f + (i % 8) * 76.0f, y = 16.0f + (i / 8) * 76.0f;
+        rb_vertex *v = &s->v[i * 4];                       /* each quad shows the whole page */
+        vtx(&v[0], x, y, white[0], 0, 0);
+        vtx(&v[1], x + 64, y, white[1], 1, 0);
+        vtx(&v[2], x + 64, y + 64, white[2], 1, 1);
+        vtx(&v[3], x, y + 64, white[3], 0, 1);
+        for (k = 0; k < 2; k++)
+            db_texture(s->img[k] + i * 32 * 32 * 4, 32, 32, 0, 40 + i * 2 + k);
+    }
+    quad_idx(s->idx, 0);
+    s->mode = t->def->param;
+    t->tris = 2.0 * 16;
+    t->pixels = 64.0 * 64 * 16;
+    t->texels = 32.0 * 32 * 16;
+    return 0;
+}
+
+static void sub_frame(tctx *t, int f)
+{
+    synth *s = (synth *)t->p;
+    rb_state st;
+    int i;
+    rb_clear(0x102030);
+    pixel_matrices(0, 0);
+    memset(&st, 0, sizeof st);
+    st.tex = RB_TEX_REPLACE;
+    rb_set_state(&st);
+    for (i = 0; i < 16; i++) {
+        const uint8_t *px = s->img[(f + i) & 1] + i * 32 * 32 * 4;
+        rb_tex_update_rect(s->tex[0], (i % 4) * 32, (i / 4) * 32, 32, 32, px);
+        if (s->mode == 1) {
+            rb_tex_bind(s->tex[0]);
+            rb_draw(&s->v[i * 4], 4, s->idx, 6);
+        }
+    }
+    if (s->mode == 0) {
+        rb_tex_bind(s->tex[0]);
+        for (i = 0; i < 16; i++)
+            rb_draw(&s->v[i * 4], 4, s->idx, 6);
+    }
+    rb_tex_bind(NULL);
+}
+
 /* ---- S4: state changes --------------------------------------------------
  * 16-pixel textured triangles drawn in chunks of k; param = k + 1000 * what
  * (0 draw calls only, 1 texture change per chunk, 2 blend change per chunk). */
@@ -458,6 +520,8 @@ const test_def synth_tests[] = {
     SYN("S3UPL", "synth", "texture upload: 256x256 replaced and drawn", 0, 0, tex_setup, tex_frame),
     SYN("S3WS8", "synth", "texture working set: 8 x 256x256 mipmapped", 0, 8, tex_setup, tex_frame),
     SYN("S3WS24", "synth", "texture working set: 24 x 256x256 mipmapped", 0, 24, tex_setup, tex_frame),
+    SYN("S3SUB", "synth", "sub-image: 16 32x32 rectangles of a 128x128 texture, then drawn", T_GL_ONLY, 0, sub_setup, sub_frame),
+    SYN("S3SUBI", "synth", "sub-image: 16 rectangles, each drawn right after its update", T_GL_ONLY, 1, sub_setup, sub_frame),
     SYN("S4D1", "synth", "state: a draw call per triangle", 0, 1, state_setup, state_frame),
     SYN("S4D16", "synth", "state: a draw call per 16 triangles", 0, 16, state_setup, state_frame),
     SYN("S4T1", "synth", "state: texture change per triangle", 0, 1001, state_setup, state_frame),

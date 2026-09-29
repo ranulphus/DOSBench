@@ -340,6 +340,12 @@ void rb_tex_update(rb_tex *t, const uint8_t *rgba)
     }
 }
 
+/* Not needed: the sub-image tests are OpenGL only (T_GL_ONLY). */
+void rb_tex_update_rect(rb_tex *t, int x, int y, int w, int h, const uint8_t *rgba)
+{
+    (void)t; (void)x; (void)y; (void)w; (void)h; (void)rgba;
+}
+
 void rb_tex_bind(rb_tex *t)
 {
     bound = t;

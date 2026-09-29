@@ -101,6 +101,22 @@ frame checks, with MGA-Glide's `tools/imgcmp.py` (tolerances in
 Output: `out/loopa/<card>/` (`serial.log`, `files/RESULTS.TXT`, `*.png`,
 `diff/`, `programs.json`, `checks.json`).
 
+The game tests (`docs/tests.md`, group `game`) need DOS-GL's Quake builds
+(`make quake` in DOS-GL) and the game fixtures (DOS-GL's
+`tools/quake/fixtures.py`, and `tools/quake/q2record.sh q2bench1` for the
+Quake 2 demo):
+
+```
+python3 tools/run.py games --card g450                  # every game test
+python3 tools/run.py games --card g450,g400,g200 --tests Q1D1,Q2D1
+```
+
+One job per card and game (the game's data on D:), running its timedemos in
+turn; then each frame against the first card, and the 8-bit and
+multitexture variants against their plain runs. Output:
+`out/games/<card>/<game>/`; `tools/report.py ingest` takes these
+directories like Loop A's.
+
 ## The bench (Loop B): numbers
 
 Bench PCs are provisioned as in MGA-Glide's `docs/bench.md`. Once per PC,

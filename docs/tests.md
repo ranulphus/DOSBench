@@ -32,6 +32,8 @@ path as the scenes. Depth testing is off.
 | S2SA16, S2SL16, S2SI16 | 16-pixel mesh through GL vertex arrays, display lists, immediate mode (OpenGL only) | Ktris/s |
 | S3UPL | a 256x256 texture replaced and drawn 4 times a frame | Mtexels/s uploaded |
 | S3WS8, S3WS24 | 8 or 24 mipmapped 256x256 textures, one 64x64 quad each | fps, KB uploaded per frame |
+| S3SUB | a 128x128 texture drawn as 16 quads, its 16 32x32 rectangles replaced first each frame (GLQuake's lightmaps; OpenGL only) | Mtexels/s uploaded |
+| S3SUBI | the same, each rectangle replaced just before its quad is drawn (Quake 2 refilling its dynamic lightmap; OpenGL only) | Mtexels/s uploaded |
 | S4D1, S4D16 | 8192 textured 16-pixel triangles, a draw call per 1 or 16 triangles | Ktris/s |
 | S4T1, S4T16 | the same with a texture change per draw call | Ktris/s |
 | S4B1, S4B16 | the same with a blend change per draw call | Ktris/s |
@@ -80,3 +82,24 @@ entities) and water (alpha-blended).
 The scene's textures fit a 2 MB TMU: world textures at 16 bits with mip
 chains, lightmaps as 8-bit intensity (1.25 MB for e0m1 with nothing scaled
 down; `tools/bsp.py` halves the largest textures when a map does not fit).
+
+## Games (group `game`)
+
+Timedemos of the Quake ports built on DOS-GL (DOS-GL's `tools/quake`: the
+forks `qdos-dosgl` and `q2dos-dosgl`), run by `tools/run.py games` from the
+owner's game data (local fixtures, never committed). The games write their
+own H and T lines (`-dosbench` in Quake, `td_dbtest` in Quake 2) and save
+frame 200 as `L<ID>.PPM`; game time advances a fixed step per frame
+(`-fixedtime`, `fixedtime 14`), so every run and every card draws the same
+frames. The catalogue is `tools/games.json`.
+
+| ID | Timedemo | Checked against |
+|---|---|---|
+| Q1D1 | GLQuake `demo1` (retail), two-pass lightmaps | the first card |
+| Q1D1M | the same with multitexture lightmaps (`-mtex`) | Q1D1; skipped until DOS-GL has `GL_ARB_multitexture` |
+| Q1D1P | the same with 8-bit paletted textures (`-8bit`) | Q1D1 |
+| Q1LQ1 | GLQuake `demo1` on LibreQuake (free data) | the first card |
+| Q2D1 | Quake 2 `q2bench1` (base1 walked and fired through; recorded by DOS-GL's `tools/quake/q2record.sh`) | the first card |
+| Q2D1M | the same with multitexture lightmaps | Q2D1; skipped until DOS-GL has `GL_ARB_multitexture` |
+| Q2D1P | the same with 8-bit paletted textures | Q2D1, looser: Quake 2 re-quantises its textures to the palette |
+

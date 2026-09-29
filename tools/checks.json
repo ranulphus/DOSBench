@@ -4,5 +4,9 @@
  "glide-vs-voodoo": {"default": {}},
  "gl-across-cards": {"default": {}},
  "glide-across-cards": {"default": {}},
- "gl-vs-glide": {"default": {"advisory": true}}
+ "gl-vs-glide": {"default": {"advisory": true}},
+ "game-across-cards": {"default": {}},
+ "game-pal-vs-rgba": {"default": {},
+   "Q2D1P": {"frac": 0.02, "_why": "Quake 2 turns 32-bit texels back into palette indices through pics/16to8.dat (GL_BuildPalettedTexture), so colours outside its palette move to the nearest entry"}},
+ "game-mtex-vs-2pass": {"default": {}}
 }

@@ -243,6 +243,14 @@ void rb_tex_update(rb_tex *t, const uint8_t *rgba)
     cur = t;
 }
 
+void rb_tex_update_rect(rb_tex *t, int x, int y, int w, int h, const uint8_t *rgba)
+{
+    glBindTexture(GL_TEXTURE_2D, t->name);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+    tex_sent += (unsigned long)w * h * 4;
+    cur = t;
+}
+
 void rb_tex_bind(rb_tex *t)
 {
     cur = t;

@@ -34,13 +34,16 @@ PRIMARY = [
     ("S1", "mpix_s", "Mpixels/s"),
     ("S2", "ktris_s", "Ktris/s"),
     ("S3UPL", "mtexel_s", "Mtexels/s"),
+    ("S3SUB", "mtexel_s", "Mtexels/s"),
     ("S3WS", "fps", "fps"),
     ("S4", "ktris_s", "Ktris/s"),
     ("M", "fps", "fps"),
     ("L", "fps", "fps"),
     ("B0", "fps", "fps"),
+    ("Q1", "fps", "fps"),
+    ("Q2", "fps", "fps"),
 ]
-GROUPS = [("basic", "Basic"), ("synth", "Synthetic"), ("model", "Models"), ("level", "Level")]
+GROUPS = [("basic", "Basic"), ("synth", "Synthetic"), ("model", "Models"), ("level", "Level"), ("game", "Games")]
 
 
 def primary(test):

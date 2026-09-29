@@ -22,6 +22,15 @@
       DOS-GL's demos and ClassiCube, for MGA-Glide's patched 86Box, including
       its Windows build (MGA-Glide tools/86box/windows/).
 
+  run.py games [--card g450[,g400,g200]] [--tests LIST]
+      The game tests (tools/games.json, group game): timedemos of DOS-GL's
+      builds of the Quake ports (DOS-GL: make quake), one Loop A job per card
+      and game on the owner's game data (local fixtures), each writing its own
+      H/T lines and frame; then checks each frame across cards and the 8-bit
+      and multitexture variants against their plain runs. Tests that need a
+      GL feature DOS-GL does not have yet are skipped. Outputs go to
+      out/games/<card>/<game>/.
+
   run.py compare DIR [DIR...]
       Re-run the image checks on existing Loop A output directories.
 
@@ -168,31 +177,37 @@ def checks_config():
     return json.load(open(CHECKS)) if os.path.exists(CHECKS) else {}
 
 
-def compare_images(dirs):
-    """Frame checks within and across Loop A output directories."""
+def image_check(results, ref, got, kind, gate, test):
+    """Compare two frames with the checks.json settings for kind and test."""
     import imgcmp
     cfg = checks_config()
-    default = cfg.get("default", {"tol": 24, "frac": 0.005})
+    opts = dict(cfg.get("default", {"tol": 24, "frac": 0.005}))
+    opts.update(cfg.get(kind, {}).get("default", {}))
+    opts.update(cfg.get(kind, {}).get(test, {}))
+    if opts.get("skip"):
+        return
+    ddir = os.path.join(os.path.dirname(got), "diff")
+    os.makedirs(ddir, exist_ok=True)
+    diff = os.path.join(ddir, "%s-vs-%s-%s" % (os.path.basename(got)[:-4], os.path.basename(os.path.dirname(ref)),
+                                                os.path.basename(ref)))
+    r = imgcmp.compare(ref, got, tol=opts["tol"], frac=opts["frac"], edge=opts.get("edge", True),
+                       box=opts.get("box", False), diff_path=diff)
+    r.update(kind=kind, test=test, ref=os.path.relpath(ref, ROOT), got=os.path.relpath(got, ROOT),
+             gate=gate and not opts.get("advisory"))
+    results.append(r)
+
+
+def shots(d, tag):
+    """Saved frames <tag><TEST>.png in an output directory, by test ID."""
+    return {os.path.basename(p)[1:-4].upper(): p for p in glob.glob(os.path.join(d, tag.lower() + "*.png"))}
+
+
+def compare_images(dirs):
+    """Frame checks within and across Loop A output directories."""
     results = []
 
     def cmp(ref, got, kind, gate, test):
-        opts = dict(default)
-        opts.update(cfg.get(kind, {}).get("default", {}))
-        opts.update(cfg.get(kind, {}).get(test, {}))
-        if opts.get("skip"):
-            return
-        ddir = os.path.join(os.path.dirname(got), "diff")
-        os.makedirs(ddir, exist_ok=True)
-        diff = os.path.join(ddir, "%s-vs-%s-%s" % (os.path.basename(got)[:-4], os.path.basename(os.path.dirname(ref)),
-                                                    os.path.basename(ref)))
-        r = imgcmp.compare(ref, got, tol=opts["tol"], frac=opts["frac"], edge=opts.get("edge", True),
-                           box=opts.get("box", False), diff_path=diff)
-        r.update(kind=kind, test=test, ref=os.path.relpath(ref, ROOT), got=os.path.relpath(got, ROOT),
-                 gate=gate and not opts.get("advisory"))
-        results.append(r)
-
-    def shots(d, tag):
-        return {os.path.basename(p)[1:-4].upper(): p for p in glob.glob(os.path.join(d, tag.lower() + "*.png"))}
+        image_check(results, ref, got, kind, gate, test)
 
     for d in dirs:
         g, v, l = shots(d, "g"), shots(d, "v"), shots(d, "l")
@@ -234,8 +249,9 @@ def cmd_loopa(a):
     return 0 if all_ok else 1
 
 
-def report_checks(dirs):
-    results = compare_images(dirs)
+def report_checks(dirs, results=None):
+    if results is None:
+        results = compare_images(dirs)
     gated_bad = [r for r in results if r["gate"] and not r["ok"]]
     for r in results:
         flag = "ok " if r["ok"] else ("BAD" if r["gate"] else "adv")
@@ -244,6 +260,132 @@ def report_checks(dirs):
     json.dump(results, open(os.path.join(dirs[0], "checks.json"), "w"), indent=1)
     print("image checks: %d compared, %d gating failures" % (len(results), len(gated_bad)))
     return not gated_bad
+
+
+GAMES = os.path.join(ROOT, "tools", "games.json")
+
+
+def game_catalogue(sel):
+    cat = {k: v for k, v in json.load(open(GAMES)).items() if not k.startswith("_")}
+    if sel in ("all", "game"):
+        return cat
+    want = [t.strip().upper() for t in sel.split(",") if t.strip()]
+    bad = [t for t in want if t not in cat]
+    if bad:
+        raise SystemExit("run.py: no game test %s (tools/games.json)" % ",".join(bad))
+    return {k: cat[k] for k in want}
+
+
+def dosgl_features():
+    """GL features DOS-GL advertises that game tests may need (see games.json "needs")."""
+    have = set()
+    src = os.path.join(VARS["DOSGL"], "src", "gl", "get.c")
+    if os.path.exists(src) and "GL_ARB_multitexture" in open(src).read():
+        have.add("mtex")
+    return have
+
+
+def games_job(card, key, tests, a):
+    """One Loop A job: every selected test of one game in turn, from its D: disk.
+    Each game command is bracketed by HX-START/HX-DONE so the job runs on
+    through the loading between them."""
+    dosgl = VARS["DOSGL"]
+    # The dev container mounts this repository and the fixture cache, not
+    # DOS-GL: stage DOS-GL's game builds and games list here.
+    q = rsp_dir = os.path.join(ROOT, "build", "games")
+    os.makedirs(q, exist_ok=True)
+    for f in ("QDOSDGL.EXE", "Q2DGL.EXE", "GAMEX86.DXE", "DOSLFN.COM"):
+        src = os.path.join(dosgl, "build", "quake", f)
+        if not os.path.exists(src):
+            raise SystemExit("run.py: no %s (DOS-GL: make quake)" % src)
+        shutil.copyfile(src, os.path.join(q, f))
+    gfile = os.path.join(q, "games.json")
+    shutil.copyfile(os.path.join(dosgl, "tools", "quake", "games.json"), gfile)
+    game = json.load(open(gfile))[key]
+    out = os.path.join(ROOT, "out", "games", card, key)
+    files, cmds = [], ["D:", "CD \\" + game["cwd"]]
+    for exe in sorted(set(t["exe"] for t in tests.values())):
+        files.append("%s=D:/%s/%s" % (os.path.join(q, exe), game["dir"], exe))
+    if key == "quake2":
+        files += ["%s=D:/QUAKE2/BASEQ2/GAMEX86.DXE" % os.path.join(q, "GAMEX86.DXE"),
+                  "%s=D:/QUAKE2/DOSLFN.COM" % os.path.join(q, "DOSLFN.COM")]
+        cmds.append("DOSLFN")
+        for demo in sorted(set(t["demo"] for t in tests.values() if t.get("demo"))):
+            src = os.path.join(CACHE, "fixtures", "games", "q2demos", demo.upper() + ".DM2")
+            if not os.path.exists(src):
+                raise SystemExit("run.py: no %s (DOS-GL: tools/quake/q2record.sh %s)" % (src, demo))
+            files.append("%s=D:/QUAKE2/BASEQ2/DEMOS/%s.DM2" % (src, demo.upper()))
+    for tid, t in tests.items():
+        rsp = os.path.join(rsp_dir, tid + ".RSP")       # DOS command lines stop at 126 characters
+        with open(rsp, "w", newline="\r\n") as f:
+            f.write(t["args"] + "\n")
+        files.append("%s=/TEST/%s.RSP" % (rsp, tid))
+        cmds += ["SERSAY HX-START %s" % tid, "%s @C:\\TEST\\%s.RSP" % (t["exe"], tid), "SERSAY HX-DONE 0"]
+    cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "loopa", "run.py"),
+           "--name", "dosbench-%s-%s" % (key, card), "--card", card, "--out", out,
+           "--games-file", gfile, "--game", key, "--pre", "SET DGL_EXIT_AFTER=0",
+           "--pre", "SET DGL_STATS=1",               # a line a second: long timedemos are not idle
+           "--timeout", str(a.timeout), "--idle", str(a.idle)]
+    for f in files:
+        cmd += ["--file", f]
+    for c in cmds:
+        cmd += ["--cmd", c]
+    print("games %s %s: %s" % (card, key, " ".join(tests)))
+    subprocess.run(cmd, cwd=ROOT)
+    return out
+
+
+def game_results(out):
+    """T records of a game job's RESULTS.TXT, by test ID."""
+    path = os.path.join(out, "files", "RESULTS.TXT")
+    recs = {}
+    if os.path.exists(path):
+        for line in open(path, errors="replace"):
+            if line.startswith("T "):
+                kv = dict(f.split("=", 1) for f in line.split()[1:] if "=" in f)
+                recs[kv.get("test", "?")] = kv
+    return recs
+
+
+def cmd_games(a):
+    cat = game_catalogue(a.tests)
+    have = dosgl_features()
+    runnable = {k: v for k, v in cat.items() if not v.get("needs") or v["needs"] in have}
+    for k in sorted(set(cat) - set(runnable)):
+        print("  %-6s skip why=no-%s" % (k, cat[k]["needs"]))
+    keys = sorted(set(t["game"] for t in runnable.values()))
+    cards = a.card.split(",")
+    dirs, ok = {}, True
+    for card in cards:
+        for key in keys:
+            tests = {k: v for k, v in runnable.items() if v["game"] == key}
+            out = games_job(card, key, tests, a)
+            dirs.setdefault(key, []).append(out)
+            recs = game_results(out)
+            for tid in tests:
+                r = recs.get(tid)
+                st = r.get("status", "?") if r else "MISSING"
+                ok = ok and st == "ok"
+                print("  %-5s %-6s %-7s %s" % (card, tid, st, "fps=%s frames=%s crc=%s" % (r["fps"], r["frames"], r["crc"])
+                                                               if r else ""))
+    results = []
+    for key, kd in dirs.items():
+        for d in kd:                                     # variants against their plain runs
+            l = shots(d, "l")
+            for tid, t in runnable.items():
+                if t.get("ref") and tid in l and t["ref"] in l:
+                    kind = "game-mtex-vs-2pass" if t.get("needs") == "mtex" else "game-pal-vs-rgba"
+                    image_check(results, l[t["ref"]], l[tid], kind, True, tid)
+        base = shots(kd[0], "l")                         # every card against the first
+        for d in kd[1:]:
+            other = shots(d, "l")
+            for tid in sorted(base):
+                if tid in other:
+                    image_check(results, base[tid], other[tid], "game-across-cards", True, tid)
+    first = next(iter(dirs.values()))[0] if dirs else os.path.join(ROOT, "out", "games")
+    ok = report_checks([first], results) and ok
+    print("games: %s" % ("PASS" if ok else "FAIL"))
+    return 0 if ok else 1
 
 
 def cmd_compare(a):
@@ -366,6 +508,11 @@ def main():
     p.add_argument("--full", action="store_true", help="full frame counts (slow in 86Box)")
     p.add_argument("--timeout", type=int, default=3600)
     p.add_argument("--idle", type=int, default=300)
+    p = sub.add_parser("games")
+    p.add_argument("--card", default="g450")
+    p.add_argument("--tests", default="all")
+    p.add_argument("--timeout", type=int, default=7200)
+    p.add_argument("--idle", type=int, default=300)
     p = sub.add_parser("compare")
     p.add_argument("dirs", nargs="+")
     p = sub.add_parser("bench")
@@ -382,7 +529,8 @@ def main():
     p.add_argument("--games", action="store_true",
                    help="also install GTA and Screamer Rally from MGA-Glide's local fixtures (private zip)")
     a = ap.parse_args()
-    return {"loopa": cmd_loopa, "compare": cmd_compare, "bench": cmd_bench, "winvm": cmd_winvm}[a.what](a)
+    return {"loopa": cmd_loopa, "games": cmd_games, "compare": cmd_compare, "bench": cmd_bench,
+            "winvm": cmd_winvm}[a.what](a)
 
 
 if __name__ == "__main__":

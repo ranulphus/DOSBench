@@ -62,6 +62,9 @@ void rb_set_matrices(const mat4 *proj, const mat4 *modelview);
 /* Textures are RGBA8, power-of-two sides up to 256, aspect up to 8:1. */
 rb_tex *rb_tex_create(int w, int h, const uint8_t *rgba, int flags);
 void rb_tex_update(rb_tex *t, const uint8_t *rgba);
+/* Replace a w x h rectangle at (x, y) of level 0 (rgba holds just that
+ * rectangle). OpenGL only: tests using it are T_GL_ONLY. */
+void rb_tex_update_rect(rb_tex *t, int x, int y, int w, int h, const uint8_t *rgba);
 void rb_tex_bind(rb_tex *t);            /* NULL unbinds */
 void rb_tex_free(rb_tex *t);
 
