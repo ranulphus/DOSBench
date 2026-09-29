@@ -20,7 +20,10 @@
   run.py winvm [--card g450] [--games]
       A ready-to-boot 86Box machine (dist/dosbench-<card>-vm.zip) with DOSBench,
       DOS-GL's demos and ClassiCube, for MGA-Glide's patched 86Box, including
-      its Windows build (MGA-Glide tools/86box/windows/).
+      its Windows build (MGA-Glide tools/86box/windows/). --games adds the
+      owner's games from the local fixtures (a private zip): GTA and Screamer
+      Rally on C:, and on a second disk D: Quake, LibreQuake and Quake 2 in
+      DOS-GL's builds (DOS-GL: make quake).
 
   run.py games [--card g450[,g400,g200]] [--tests LIST]
       The game tests (tools/games.json, group game): timedemos of DOS-GL's
@@ -451,6 +454,66 @@ runtime on the emulated Voodoo, copy a retail GLIDE2X.OVL of your own in
 and run BENCHG --glide=THATFILE (it is not included).
 """
 
+QUAKE_NOTES = """
+What is on D: (the Quakes in DOS-GL's builds, on the Matrox card; D:\\ is on PATH)
+  QUAKE         Quake (retail; your copy) in GLQuake (qdos). Options go to the
+                game: -mtex (multitexture: G400/G450), -8bit (paletted
+                textures), +timedemo demo1 (or demo2, demo3).
+  LQ            the same engine on LibreQuake's free data.
+  QUAKE2        Quake 2 (retail; your copy). Options go to the game:
+                +set gl_ext_multitexture 1 (G400/G450; off by default in the
+                DOS port), +set gl_ext_palettedtexture 1,
+                +set timedemo 1 +demomap q2bench1.dm2 (a demo you recorded).
+  The games start with sound enabled on the Sound Blaster 16 (BLASTER is set
+  at boot; add -nosound, or +set s_initsound 0 for Quake 2, to turn it off).
+  The games are in
+  D:\\QUAKE, D:\\LQ and D:\\QUAKE2 (with CWSDPMI from C:\\HX). This is retail
+  data: the zip is for your own machine only.
+"""
+
+# The Quakes on D: for --games: (fixture dir, D: directory, launcher, title,
+# the game's command line).
+QUAKES = [("quake", "QUAKE", "QUAKE", "Quake (retail) in GLQuake on DOS-GL",
+           "QDOSDGL.EXE -width 640 -height 480 -nocdaudio -nolan"),
+          ("lq", "LQ", "LQ", "LibreQuake in GLQuake on DOS-GL",
+           "QDOSDGL.EXE -width 640 -height 480 -nocdaudio -nolan"),
+          ("quake2", "QUAKE2", "QUAKE2", "Quake 2 (retail) on DOS-GL",
+           "Q2DGL.EXE")]
+
+
+def quake_disk(dosgl, stage):
+    """mkwinvm --d-dir/--d-file arguments putting the Quakes on D:, or [] when
+    DOS-GL's builds or the fixtures are missing."""
+    q = os.path.join(dosgl, "build", "quake")
+    fix = os.path.join(CACHE, "fixtures", "games")
+    need = [os.path.join(q, f) for f in ("QDOSDGL.EXE", "Q2DGL.EXE", "GAMEX86.DXE", "DOSLFN.COM")]
+    need += [os.path.join(fix, g) for g, *_ in QUAKES]
+    missing = [p for p in need if not os.path.exists(p)]
+    if missing:
+        print("winvm: no Quakes (missing %s)" % ", ".join(missing))
+        return []
+    def staged(src):
+        dst = os.path.join(stage, "quake-" + os.path.basename(src))
+        shutil.copyfile(src, dst)
+        return dst
+    args = []
+    for g, ddir, bat, title, cmd in QUAKES:
+        args += ["--d-dir", "%s=/%s" % (os.path.join(fix, g), ddir)]
+        lines = ["@ECHO OFF", "REM %s [options]: %s" % (bat, title), "D:", "CD \\" + ddir]
+        if g == "quake2":
+            lines.append("DOSLFN > NUL")
+        lines += [cmd + " %1 %2 %3 %4 %5 %6 %7 %8 %9", "C:", "CD \\"]
+        path = os.path.join(stage, bat + ".BAT")
+        open(path, "w", newline="").write("\r\n".join(lines) + "\r\n")
+        args += ["--d-file", "%s=/%s.BAT" % (path, bat)]
+        exe = cmd.split()[0]
+        args += ["--d-file", "%s=/%s/%s" % (staged(os.path.join(q, exe)), ddir, exe)]
+    args += ["--d-file", "%s=/QUAKE2/BASEQ2/GAMEX86.DXE" % staged(os.path.join(q, "GAMEX86.DXE")),
+             "--d-file", "%s=/QUAKE2/DOSLFN.COM" % staged(os.path.join(q, "DOSLFN.COM"))]
+    for dm in sorted(glob.glob(os.path.join(fix, "q2demos", "*.DM2"))):
+        args += ["--d-file", "%s=/QUAKE2/BASEQ2/DEMOS/%s" % (dm, os.path.basename(dm))]
+    return args + ["--d-cylinders", "1023"]
+
 
 def cmd_winvm(a):
     """A ready-to-boot 86Box machine with DOSBench, DOS-GL's demos and
@@ -485,8 +548,9 @@ def cmd_winvm(a):
             src = copy
         staged.append("%s=%s" % (src, dst))
     files = staged
+    quake = quake_disk(dosgl, stage) if a.games else []
     notes = os.path.join(ROOT, "build", "winvm-notes.txt")
-    open(notes, "w").write(WINVM_NOTES)
+    open(notes, "w").write(WINVM_NOTES + (QUAKE_NOTES if quake else ""))
     out = os.path.join(ROOT, "dist", name + "-vm.zip")
     cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "86box", "mkwinvm.py"),
            "--name", name, "--card", a.card, "--readme", notes, "--out", out,
@@ -495,7 +559,7 @@ def cmd_winvm(a):
         cmd += ["--file", f]
     if a.games:
         # Retail games from MGA-Glide's local fixtures: this zip is for the owner's machine only.
-        cmd += ["--game", "gta", "--game", "sr", "--mga-ovl", os.path.join(MGA, "build/ow/GLIDE2X.OVL")]
+        cmd += ["--game", "gta", "--game", "sr", "--mga-ovl", os.path.join(MGA, "build/ow/GLIDE2X.OVL")] + quake
     return subprocess.run(cmd, cwd=ROOT).returncode
 
 
@@ -529,7 +593,7 @@ def main():
     p = sub.add_parser("winvm")
     p.add_argument("--card", default="g450", choices=["g100", "g200", "g400", "g450"])
     p.add_argument("--games", action="store_true",
-                   help="also install GTA and Screamer Rally from MGA-Glide's local fixtures (private zip)")
+                   help="also install GTA, Screamer Rally and the Quakes from the local fixtures (private zip)")
     a = ap.parse_args()
     return {"loopa": cmd_loopa, "games": cmd_games, "compare": cmd_compare, "bench": cmd_bench,
             "winvm": cmd_winvm}[a.what](a)
