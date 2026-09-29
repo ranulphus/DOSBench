@@ -276,11 +276,12 @@ def game_catalogue(sel):
     return {k: cat[k] for k in want}
 
 
-def dosgl_features():
-    """GL features DOS-GL advertises that game tests may need (see games.json "needs")."""
+def dosgl_features(card):
+    """GL features DOS-GL advertises on a card that game tests may need
+    (games.json "needs"): multitexture only on the dual-texture G400 and G450."""
     have = set()
     src = os.path.join(VARS["DOSGL"], "src", "gl", "get.c")
-    if os.path.exists(src) and "GL_ARB_multitexture" in open(src).read():
+    if os.path.exists(src) and "GL_ARB_multitexture" in open(src).read() and card in ("g400", "g450"):
         have.add("mtex")
     return have
 
@@ -349,15 +350,16 @@ def game_results(out):
 
 def cmd_games(a):
     cat = game_catalogue(a.tests)
-    have = dosgl_features()
-    runnable = {k: v for k, v in cat.items() if not v.get("needs") or v["needs"] in have}
-    for k in sorted(set(cat) - set(runnable)):
-        print("  %-6s skip why=no-%s" % (k, cat[k]["needs"]))
-    keys = sorted(set(t["game"] for t in runnable.values()))
     cards = a.card.split(",")
     dirs, ok = {}, True
+    all_run = {}
     for card in cards:
-        for key in keys:
+        have = dosgl_features(card)
+        runnable = {k: v for k, v in cat.items() if not v.get("needs") or v["needs"] in have}
+        all_run.update(runnable)
+        for k in sorted(set(cat) - set(runnable)):
+            print("  %-5s %-6s skip why=no-%s" % (card, k, cat[k]["needs"]))
+        for key in sorted(set(t["game"] for t in runnable.values())):
             tests = {k: v for k, v in runnable.items() if v["game"] == key}
             out = games_job(card, key, tests, a)
             dirs.setdefault(key, []).append(out)
@@ -372,7 +374,7 @@ def cmd_games(a):
     for key, kd in dirs.items():
         for d in kd:                                     # variants against their plain runs
             l = shots(d, "l")
-            for tid, t in runnable.items():
+            for tid, t in all_run.items():
                 if t.get("ref") and tid in l and t["ref"] in l:
                     kind = "game-mtex-vs-2pass" if t.get("needs") == "mtex" else "game-pal-vs-rgba"
                     image_check(results, l[t["ref"]], l[tid], kind, True, tid)
