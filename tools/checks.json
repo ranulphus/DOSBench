@@ -8,5 +8,12 @@
  "game-across-cards": {"default": {}},
  "game-pal-vs-rgba": {"default": {},
    "Q2D1P": {"frac": 0.02, "_why": "Quake 2 turns 32-bit texels back into palette indices through pics/16to8.dat (GL_BuildPalettedTexture), so colours outside its palette move to the nearest entry"}},
- "game-mtex-vs-2pass": {"default": {}}
+ "game-mtex-vs-2pass": {"default": {}},
+ "cards": {
+   "_about": "Per card (the output directory's name), per test, over any kind: what the card cannot draw the same way.",
+   "g100": {
+     "S1BLND": {"box": true, "_why": "the G100 blends by stipple (MGA-Glide D8, DOS-GL likewise): compared through a 4x4 box filter, as in MGA-Glide's conformance manifest"},
+     "L1LQ2P": {"advisory": true, "_why": "the second pass multiplies by the destination, which the G100 cannot do: MGA-Glide skips it (D8), DOS-GL supports the G100 for development only"}
+   }
+ }
 }

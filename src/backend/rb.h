@@ -38,6 +38,8 @@ typedef struct {
     char card[40];              /* what the implementation reports */
     int width, height;
     unsigned long tex_mem;      /* bytes available to textures */
+    int display_w, display_h;   /* the BIOS mode on the monitor (0: not known, e.g. Glide) */
+    char fit[12];               /* how the picture is shown: native, zoom, integer, fill, aspect; "?" */
     int max_tex;                /* largest texture side */
 } rb_info;
 

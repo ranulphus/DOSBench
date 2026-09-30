@@ -127,10 +127,17 @@ def loopa_job(card, a):
         common += " --quick"
     if a.modes:
         common += " --modes " + a.modes
+    # The options go in a file (--args): DOS/4GW passes BENCHG only about 100
+    # characters, which a --modes list and the Voodoo run's options exceed.
+    os.makedirs(os.path.join(ROOT, "out", "loopa"), exist_ok=True)
+    argfile = os.path.join(ROOT, "out", "loopa", "args-%s.txt" % card)
+    open(argfile, "w", newline="\r\n").write(common + "\n")
     files = ["%s=/TEST/BENCHG.EXE" % os.path.join(ROOT, "build/dos/BENCHG.EXE"),
-             "%s=/TEST/BENCHGL.EXE" % os.path.join(ROOT, "build/dos/BENCHGL.EXE")]
+             "%s=/TEST/BENCHGL.EXE" % os.path.join(ROOT, "build/dos/BENCHGL.EXE"),
+             "%s=/TEST/ARGS.TXT" % argfile]
     for f in data_files():
         files.append("%s=/DOSBENCH/DATA/%s" % (f, os.path.basename(f).upper()))
+    common = "--args C:\\TEST\\ARGS.TXT"
     cmds = ["C:\\TEST\\BENCHGL.EXE " + common,
             "C:\\TEST\\BENCHG.EXE %s --glide=C:\\TEST\\GLIDE2X.OVL" % common]
     ref = a.ref and card == a.ref_card
@@ -187,6 +194,8 @@ def image_check(results, ref, got, kind, gate, test):
     opts = dict(cfg.get("default", {"tol": 24, "frac": 0.005}))
     opts.update(cfg.get(kind, {}).get("default", {}))
     opts.update(cfg.get(kind, {}).get(test, {}))
+    # then the frame's card (its output directory): a card's own limits
+    opts.update(cfg.get("cards", {}).get(os.path.basename(os.path.dirname(got)), {}).get(test, {}))
     if opts.get("skip"):
         return
     ddir = os.path.join(os.path.dirname(got), "diff")
@@ -230,12 +239,36 @@ def compare_images(dirs):
     return results
 
 
+def fill_glide_display(out):
+    """Glide cannot tell BENCHG how MGA-Glide shows a size: take it from the
+    runtime's MGL-WINOPEN lines (display=WxH fit=F), in order, into the H
+    lines of api=glide that say display=?."""
+    res, serial = os.path.join(out, "files", "RESULTS.TXT"), os.path.join(out, "serial.log")
+    if not (os.path.exists(res) and os.path.exists(serial)):
+        return
+    opens = re.findall(r"MGL-WINOPEN (\d+x\d+) .*?display=(\d+x\d+) fit=(\w+)",
+                       open(serial, "rb").read().decode("latin-1"))
+    lines, changed = open(res, "rb").read().decode("latin-1").split("\n"), False
+    for i, l in enumerate(lines):
+        if l.startswith("H ") and " api=glide " in l and " display=? " in l + " ":
+            m = re.search(r" mode=(\d+x\d+)", l)
+            for j, (mode, disp, fit) in enumerate(opens):
+                if m and mode == m.group(1):
+                    lines[i] = l.replace(" display=?", " display=" + disp).replace(" fit=?", " fit=" + fit)
+                    del opens[j]
+                    changed = True
+                    break
+    if changed:
+        open(res, "wb").write("\n".join(lines).encode("latin-1"))
+
+
 def cmd_loopa(a):
     cards = a.card.split(",")
     a.ref_card = cards[0]
     dirs, all_ok = [], True
     for card in cards:
         out = loopa_job(card, a)
+        fill_glide_display(out)
         dirs.append(out)
         expect = ["L", "G"] + (["V"] if a.ref and card == a.ref_card and os.path.exists(REF_OVL) else [])
         ok, summary = summarise(out, expect)
@@ -430,6 +463,8 @@ def cmd_bench(a):
     rc = subprocess.run(cmd, cwd=MGA).returncode
     if not a.install_data:
         jobs = sorted(glob.glob(os.path.join(MGA, "out", "bench", a.pc, "dosbench-*")), key=os.path.getmtime)
+        if jobs:
+            fill_glide_display(jobs[-1])
         if jobs and os.path.exists(os.path.join(jobs[-1], "files", "RESULTS.TXT")):
             print("results: %s (python3 tools/report.py ingest %s --pc %s)" % (jobs[-1], jobs[-1], a.pc))
     return rc

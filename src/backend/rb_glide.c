@@ -84,11 +84,13 @@ int rb_load(const char *path, char *err, int errlen)
 
 static int resolution(int w, int h)
 {
+    /* Every Glide 2 size DOSBench runs (640x512 has no code: MGAGLIDE res=). */
     static const struct { int w, h, code; } modes[] = {
-        { 320, 240, GR_RESOLUTION_320x240 }, { 400, 300, GR_RESOLUTION_400x300 },
-        { 512, 384, GR_RESOLUTION_512x384 }, { 640, 400, GR_RESOLUTION_640x400 },
-        { 640, 480, GR_RESOLUTION_640x480 }, { 800, 600, GR_RESOLUTION_800x600 },
-        { 1024, 768, GR_RESOLUTION_1024x768 }, { 0, 0, 0 },
+        { 320, 200, GR_RESOLUTION_320x200 }, { 320, 240, GR_RESOLUTION_320x240 },
+        { 400, 300, GR_RESOLUTION_400x300 }, { 512, 384, GR_RESOLUTION_512x384 },
+        { 640, 400, GR_RESOLUTION_640x400 }, { 640, 480, GR_RESOLUTION_640x480 },
+        { 800, 600, GR_RESOLUTION_800x600 }, { 1024, 768, GR_RESOLUTION_1024x768 },
+        { 1280, 1024, GR_RESOLUTION_1280x1024 }, { 1600, 1200, GR_RESOLUTION_1600x1200 }, { 0, 0, 0 },
     };
     int i;
     for (i = 0; modes[i].w; i++)
@@ -129,6 +131,8 @@ int rb_open(int w, int h, int vs, char *err, int errlen)
     info.width = w;
     info.height = h;
     info.max_tex = 256;
+    info.display_w = info.display_h = 0;            /* the runtime says, on COM1 (MGL-WINOPEN) */
+    strcpy(info.fit, "?");
     tmu_min = gl.grTexMinAddress(GR_TMU0);
     tmu_max = gl.grTexMaxAddress(GR_TMU0);
     tmu_next = tmu_min;

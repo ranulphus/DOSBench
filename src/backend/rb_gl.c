@@ -65,6 +65,9 @@ int rb_open(int w, int h, int vsync, char *err, int errlen)
     info.width = w;
     info.height = h;
     info.tex_mem = d->vram_bytes;
+    info.display_w = d->display_width;
+    info.display_h = d->display_height;
+    snprintf(info.fit, sizeof info.fit, "%s", d->fit ? d->fit : "?");
     {
         GLint m = 0;
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m);

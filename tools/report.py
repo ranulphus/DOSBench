@@ -189,10 +189,21 @@ def derived(best, tgt, mode):
     return out
 
 
+def shown_in(best, mode):
+    """' (shown in 640x480: integer)' when a size was scaled or zoomed into a
+    larger BIOS mode (H line display= fit=, from 2026-09); else ''."""
+    seen = sorted({(r.get("display"), r.get("fit")) for k, r in best.items() if k[1] == mode
+                   and r.get("fit") not in (None, "", "?", "native")})
+    return "" if not seen else " (shown in " + ", ".join("%s: %s" % (d or "?", f) for d, f in seen) + ")"
+
+
 def matrix(recs):
     best = latest_by(recs)
     targets = sorted({k[0] for k in best})
-    modes = sorted({k[1] for k in best})
+    def area(m):
+        w, _, h = (m or "0x0").partition("x")
+        return (int(w) * int(h) if w.isdigit() and h.isdigit() else 0, m or "")
+    modes = sorted({k[1] for k in best}, key=area)
     tests = []
     for k in best:
         if k[2] not in tests:
@@ -217,7 +228,7 @@ def cmd_table(a):
         return 1
     best, targets, modes, tests, _ = matrix(recs)
     for mode in modes:
-        print("\n== %s" % mode)
+        print("\n== %s%s" % (mode, shown_in(best, mode)))
         for i, t in enumerate(targets):
             print("  [%d] %s" % (i + 1, t))
         print("  %-8s %-10s " % ("test", "metric") + " ".join("%10s" % ("[%d]" % (i + 1)) for i in range(len(targets))))
@@ -325,7 +336,7 @@ def cmd_html(a):
         '<li><span class="sw" style="background:%s"></span>%s</li>' % (COLOURS[i % len(COLOURS)], html.escape(t))
         for i, t in enumerate(targets)) + "</ul>")
     for mode in modes:
-        body.append("<h2>%s</h2>" % html.escape(mode))
+        body.append("<h2>%s</h2>" % html.escape(mode + shown_in(best, mode)))
         for g, gname in GROUPS:
             gtests = [t for t in tests if group_of.get(t) == g and any((tg, mode, t) in best for tg in targets)]
             if not gtests:

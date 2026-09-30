@@ -26,12 +26,20 @@ BENCHG  [options] --glide=PATH      Glide via an OVL (DOS/4GW; needs DOS4GW.EXE)
   --tests LIST        IDs, prefixes, groups or all (default)
   --tests-from FILE   the same, read from a file (names separated by commas or lines)
   --args FILE         more arguments from a file (DOS command lines are short)
-  --modes WxH,...     screen modes (default 640x480): 512x384, 640x480, 800x600, 1024x768
+  --modes WxH,...|all screen modes (default 640x480); all = 320x200, 320x240, 400x300, 512x384,
+                      640x480, 640x512, 800x600, 1024x768, 1280x1024, 1600x1200, where a mode
+                      the card cannot show is skipped (HX-STAT skip), not failed. Sizes the
+                      BIOS lacks are drawn at their size and scaled (or, with DGL_ZOOM=1 /
+                      MGAGLIDE zoom=1, zoomed) into a larger BIOS mode; the H line records
+                      display=WxH fit=native|zoom|integer|fill|aspect. Glide has no 640x512:
+                      run it with SET MGAGLIDE=res=640x512 and --modes 640x480
   --secs S            target seconds per timed test (default 5)
   --submit arrays|lists|immediate   OpenGL static geometry path (default arrays)
   --vsync             sync swaps to the retrace
-  --shots             save one frame per test as <out>\<tag><ID>.PPM
-  --shot-frames F,..  also save these frames (camera paths: along the path)
+  --shots             save one frame per test as <out>\<tag><ID>.PPM, in one mode:
+                      640x480 when it is among --modes (every card and the Voodoo
+                      have it, so the image checks compare like with like), else the first
+  --shot-frames F,..  also save these frames (camera paths: along the path), same mode
   --data DIR          scene files (default C:\DOSBENCH\DATA)
   --out DIR           results and frames (default C:\OUT)
   --tag C             image-name prefix (default G or L)
@@ -96,7 +104,13 @@ frame checks, with MGA-Glide's `tools/imgcmp.py` (tolerances in
 |---|---|
 | Glide on MGA-Glide against Glide on the Voodoo, same test | yes |
 | OpenGL on each card against the first card | yes |
+| Glide on each card against the first card | yes |
 | OpenGL against Glide | no (advisory: the APIs rasterise differently) |
+
+`checks.json`'s `cards` section relaxes single tests on one card, for what
+that card cannot draw the same way: on the G100, S1BLND (stipple blending)
+is compared through a 4x4 box filter and L1LQ2P (a pass that multiplies by
+the destination) is advisory.
 
 Output: `out/loopa/<card>/` (`serial.log`, `files/RESULTS.TXT`, `*.png`,
 `diff/`, `programs.json`, `checks.json`).

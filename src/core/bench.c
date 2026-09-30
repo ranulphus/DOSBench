@@ -7,7 +7,7 @@
  * frame-to-frame time, and the time spent submitting before the swap. After
  * measuring it may draw one more, fixed frame and save it for image checks.
  *
- *   BENCHG [--tests LIST | --tests-from FILE] [--modes WxH,...] [--quick] [--shots] [--vsync]
+ *   BENCHG [--tests LIST | --tests-from FILE] [--modes WxH,...|all] [--quick] [--shots] [--vsync]
  *          [--args FILE (more arguments from a file)]
  *          [--submit arrays|lists|immediate] [--secs S] [--data DIR]
  *          [--tag C] [--shot-frames F,...] [--list] [--glide=PATH] [--out DIR]
@@ -247,7 +247,7 @@ static void run_test(const test_def *d)
     if (t.tris_drawn > 0)
         t.tris = t.tris_drawn / n;      /* varies per frame: the average */
     st_summarise(ft, n, &s);
-    if (db.shots) {
+    if (db.shots && db.w == db.shot_w && db.h == db.shot_h) {
         long bytes = (long)db.w * db.h * 3;
         uint8_t *rgb = (uint8_t *)malloc((size_t)bytes);
         d->frame(&t, t.capture_frame);
@@ -260,7 +260,7 @@ static void run_test(const test_def *d)
         free(rgb);
         rb_swap();
     }
-    if (shot_frames && strlen(d->id) <= 6) {
+    if (shot_frames && strlen(d->id) <= 6 && db.w == db.shot_w && db.h == db.shot_h) {
         long bytes = (long)db.w * db.h * 3;
         uint8_t *rgb = (uint8_t *)malloc((size_t)bytes);
         const char *p = shot_frames;
@@ -290,12 +290,16 @@ static void run_test(const test_def *d)
         d->done(&t);
 }
 
-static int run_mode(int w, int h)
+static int run_mode(int w, int h, int optional)
 {
-    char err[128] = "", impl[64], card[40];
+    char err[128] = "", impl[64], card[40], disp[16];
     const rb_info *in;
     int ti, i;
     if (rb_open(w, h, db.vsync, err, sizeof err) < 0) {
+        if (optional) {                         /* --modes all: a size this card cannot show */
+            hx_log("HX-STAT skip mode %dx%d: %s", w, h, err);
+            return 0;
+        }
         hx_test("open", 0, "%dx%d: %s", w, h, err);
         return -1;
     }
@@ -306,10 +310,15 @@ static int run_mode(int w, int h)
     snprintf(card, sizeof card, "%s", in->card);
     sanitise(impl);
     sanitise(card);
+    if (in->display_w)
+        snprintf(disp, sizeof disp, "%dx%d", in->display_w, in->display_h);
+    else
+        strcpy(disp, "?");
     res_line("H run=%s prog=%s ver=%s build=%s tag=%c api=%s impl=%s card=%s mode=%dx%d vsync=%d submit=%s "
-             "timer=%s cpu_mhz=%.1f tex_kb=%lu quick=%d",
+             "timer=%s cpu_mhz=%.1f tex_kb=%lu quick=%d display=%s fit=%s",
              run_id, DB_PROG, DB_VERSION, DB_BUILD_ID, db.tag, in->api, impl, card, w, h, db.vsync,
-             submit_name(db.submit), tmr_source(), tmr_hz() / 1e6, in->tex_mem / 1024, db.quick);
+             submit_name(db.submit), tmr_source(), tmr_hz() / 1e6, in->tex_mem / 1024, db.quick, disp,
+             in->fit[0] ? in->fit : "?");
     rb_set_submit(db.submit);
     for (ti = 0; tables[ti]; ti++)
         for (i = 0; tables[ti][i].id; i++)
@@ -322,7 +331,7 @@ static int run_mode(int w, int h)
 /* ---- Options ----------------------------------------------------------- */
 static void usage(void)
 {
-    hx_log("usage: %s [--tests LIST] [--modes WxH,...] [--quick] [--shots] [--vsync] "
+    hx_log("usage: %s [--tests LIST] [--modes WxH,...|all] [--quick] [--shots] [--vsync] "
            "[--submit arrays|lists|immediate] [--secs S] [--data DIR] [--tag C] [--list] [--glide=PATH]",
            DB_PROG);
 }
@@ -426,15 +435,25 @@ int main(int argc, char **argv)
     {
         /* Parse every mode first: the test selection uses strtok too. */
         char buf[160], *tok;
-        int mw[16], mh[16], nm = 0;
-        snprintf(buf, sizeof buf, "%s", modes_arg);
+        int mw[16], mh[16], nm = 0, all = !strcmp(modes_arg, "all");
+        /* all: the ten sizes; a card that cannot show one skips it. */
+        snprintf(buf, sizeof buf, "%s", all ? "320x200,320x240,400x300,512x384,640x480,640x512,800x600,"
+                                              "1024x768,1280x1024,1600x1200" : modes_arg);
         for (tok = strtok(buf, ","); tok && nm < 16; tok = strtok(NULL, ","))
             if (sscanf(tok, "%dx%d", &mw[nm], &mh[nm]) == 2)
                 nm++;
             else
                 hx_test("mode", 0, "bad mode %s", tok);
+        /* Frames are saved by test name alone (8.3 names leave no room for
+           the size), so in one mode only: 640x480, which every card and the
+           Voodoo can show, or else the first. */
+        db.shot_w = nm ? mw[0] : 0;
+        db.shot_h = nm ? mh[0] : 0;
         for (i = 0; i < nm; i++)
-            run_mode(mw[i], mh[i]);
+            if (mw[i] == 640 && mh[i] == 480)
+                db.shot_w = 640, db.shot_h = 480;
+        for (i = 0; i < nm; i++)
+            run_mode(mw[i], mh[i], all);
     }
     res_close();
     hx_done(0);

@@ -50,6 +50,17 @@ used, at 55 ms resolution; DJGPP falls back to `uclock()`.
 - The frame saved for image checks (`--shots`) is drawn after measuring,
   at a fixed frame number, so it never affects the timings.
 
+## Scaled and zoomed modes
+
+The Matrox BIOSes offer 16-bit 640x480, 800x600, 1024x768 and 1280x1024
+(1600x1200 only in the G100's). DOS-GL and MGA-Glide show the other sizes
+in a larger BIOS mode: scaled, where the drawing engine copies each frame
+into the display mode at every swap, or zoomed, where the chip repeats
+lines and pixels at no cost. A scaled mode's frame times include that copy
+(DOS-GL reports it separately as DGL-STAT `present_ms`), so it is not the
+same measurement as a native mode of the same size: the H line's `display=`
+and `fit=` say which it was, and the report prints them beside the mode.
+
 ## What 86Box numbers mean
 
 Nothing about real hardware: 86Box runs the Matrox 3D engine and the Voodoo

@@ -20,12 +20,14 @@ typedef struct { const char *id, *group, *what; int gl_only; } menu_test;
 #define LIST_TOP 3
 #define LIST_ROWS 18
 
-enum { O_GL, O_GLIDE, O_M512, O_M640, O_M800, O_M1024, O_VSYNC, O_SUBMIT, O_SECS, O_SHOTS, O_COUNT };
+#define NMODES 10
+enum { O_GL, O_GLIDE, O_M0, O_VSYNC = O_M0 + NMODES, O_SUBMIT, O_SECS, O_SHOTS, O_COUNT };
 static const char *const submit_names[] = { "arrays", "lists", "immediate" };
 static const int secs_values[] = { 3, 5, 10, 20 };
-static const char *const mode_names[] = { "512x384", "640x480", "800x600", "1024x768" };
+static const char *const mode_names[NMODES] = { "320x200", "320x240", "400x300", "512x384", "640x480",
+                                                "640x512", "800x600", "1024x768", "1280x1024", "1600x1200" };
 
-static int opt[O_COUNT] = { 1, 1, 0, 1, 0, 0, 0, 0, 1, 0 };
+static int opt[O_COUNT] = { 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0 };   /* GL, Glide, 640x480, 5 s */
 static int sel[MAX_TESTS];
 static int ntests;
 
@@ -109,8 +111,9 @@ static void row_text(int r, char *buf, size_t n)
         switch (r) {
         case O_GL: snprintf(buf, n, " [%c] OpenGL on DOS-GL        (BENCHGL.EXE)", opt[r] ? 'x' : ' '); break;
         case O_GLIDE: snprintf(buf, n, " [%c] Glide via GLIDE2X.OVL   (BENCHG.EXE)", opt[r] ? 'x' : ' '); break;
-        case O_M512: case O_M640: case O_M800: case O_M1024:
-            snprintf(buf, n, " [%c] Mode %s", opt[r] ? 'x' : ' ', mode_names[r - O_M512]);
+        case O_M0: case O_M0 + 1: case O_M0 + 2: case O_M0 + 3: case O_M0 + 4:
+        case O_M0 + 5: case O_M0 + 6: case O_M0 + 7: case O_M0 + 8: case O_M0 + 9:
+            snprintf(buf, n, " [%c] Mode %s", opt[r] ? 'x' : ' ', mode_names[r - O_M0]);
             break;
         case O_VSYNC: snprintf(buf, n, "     Vsync: %s", opt[r] ? "on" : "off (measure the hardware)"); break;
         case O_SUBMIT: snprintf(buf, n, "     OpenGL static geometry: %s", submit_names[opt[r]]); break;
@@ -165,10 +168,10 @@ static void toggle(int r)
 static int write_run(void)
 {
     FILE *f;
-    char modes[64] = "";
+    char modes[128] = "";
     int i, any = 0;
-    for (i = 0; i < 4; i++)
-        if (opt[O_M512 + i]) {
+    for (i = 0; i < NMODES; i++)
+        if (opt[O_M0 + i]) {
             if (modes[0])
                 strcat(modes, ",");
             strcat(modes, mode_names[i]);

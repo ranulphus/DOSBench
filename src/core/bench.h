@@ -12,7 +12,8 @@
 
 typedef struct {
     int quick;                  /* --quick: a few frames per test (Loop A) */
-    int shots;                  /* --shots: save one frame per test */
+    int shots;                  /* --shots: save one frame per test, in one mode */
+    int shot_w, shot_h;         /* that mode: 640x480 if run, else the first */
     int vsync;
     int submit;                 /* RB_SUBMIT_* for static geometry */
     double secs;                /* target seconds per test */
