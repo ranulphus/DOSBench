@@ -66,7 +66,7 @@ def make_vars():
                 if "?=" in line and m.group(1) in vals and m.group(1) != "HOME":
                     continue
                 vals[m.group(1)] = val
-    for k in ("MGA_GLIDE", "DOSGL"):
+    for k in ("MGA_GLIDE", "DOSGL", "FIFTHWHEEL"):
         if os.environ.get(k):
             vals[k] = os.environ[k]
     return vals
@@ -387,6 +387,41 @@ def games_job(card, key, tests, a):
     return out
 
 
+def fw_job(card, tests, a):
+    """Fifth Wheel's tests (FIFTHWHEEL: its game and the dgk kit on DOS-GL):
+    no retail data, so everything goes on C:. FW1 times 3,000 frames of the
+    autopilot driving its generated world; FWP is the performance probe. The game writes its own H
+    and T lines (dgk/bench.h)."""
+    fw = VARS.get("FIFTHWHEEL", os.path.expanduser("~/FifthWheel"))
+    q = rsp_dir = os.path.join(ROOT, "build", "games", "fifthwheel")
+    os.makedirs(q, exist_ok=True)
+    for src, name in ((os.path.join(fw, "build", "dos", "FWHEEL.EXE"), "FWHEEL.EXE"),
+                      (os.path.join(fw, "build", "data", "WORLD.PAK"), "WORLD.PAK")):
+        if not os.path.exists(src):
+            raise SystemExit("run.py: no %s (Fifth Wheel: make dos)" % src)
+        shutil.copyfile(src, os.path.join(q, name))
+    out = os.path.join(ROOT, "out", "games", card, "fifthwheel")
+    files = ["%s=/TEST/FWHEEL.EXE" % os.path.join(q, "FWHEEL.EXE"), "%s=/TEST/WORLD.PAK" % os.path.join(q, "WORLD.PAK")]
+    cmds = ["C:", "CD \\TEST"]
+    for tid, t in tests.items():
+        rsp = os.path.join(rsp_dir, tid + ".RSP")
+        with open(rsp, "w", newline="\r\n") as f:
+            f.write(t["args"] + "\n")
+        files.append("%s=/TEST/%s.RSP" % (rsp, tid))
+        cmds += ["SERSAY HX-START %s" % tid, "%s @C:\\TEST\\%s.RSP" % (t["exe"], tid), "SERSAY HX-DONE 0"]
+    cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "loopa", "run.py"),
+           "--name", "dosbench-fifthwheel-%s" % card, "--card", card, "--out", out,
+           "--pre", "SET DGL_STATS=1", "--pre", "SET SDL_AUDIO_DRIVER=dummy",
+           "--timeout", str(a.timeout), "--idle", str(a.idle)]
+    for f in files:
+        cmd += ["--file", f]
+    for c in cmds:
+        cmd += ["--cmd", c]
+    print("games %s fifthwheel: %s" % (card, " ".join(tests)))
+    subprocess.run(cmd, cwd=ROOT)
+    return out
+
+
 def game_results(out):
     """T records of a game job's RESULTS.TXT, by test ID."""
     path = os.path.join(out, "files", "RESULTS.TXT")
@@ -412,7 +447,7 @@ def cmd_games(a):
             print("  %-5s %-6s skip why=no-%s" % (card, k, cat[k]["needs"]))
         for key in sorted(set(t["game"] for t in runnable.values())):
             tests = {k: v for k, v in runnable.items() if v["game"] == key}
-            out = games_job(card, key, tests, a)
+            out = fw_job(card, tests, a) if key == "fifthwheel" else games_job(card, key, tests, a)
             dirs.setdefault(key, []).append(out)
             recs = game_results(out)
             for tid in tests:

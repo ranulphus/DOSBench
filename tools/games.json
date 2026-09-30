@@ -21,5 +21,9 @@
  "HLD1V": {"game": "halflife", "what": "Half-Life hlbench1 on Xash3D's VBO path (gl_vbo 1: world lightmaps in the second texture unit, one pass)", "demo": "hlbench1", "needs": "mtex", "ref": "HLD1",
            "exe": "HLDGL.EXE", "args": "-game valve -nosound -width 640 -height 480 +host_framerate 0.02 +gl_vbo 1 +gl_vsync 0 +set td_seed 1 +set td_quit 1 +set td_dbtest HLD1V +timedemo hlbench1"},
  "HLD2V": {"game": "halflife", "what": "Half-Life hlbench2 on Xash3D's VBO path (gl_vbo 1)", "demo": "hlbench2", "needs": "mtex", "ref": "HLD2",
-           "exe": "HLDGL.EXE", "args": "-game valve -nosound -width 640 -height 480 +host_framerate 0.02 +gl_vbo 1 +gl_vsync 0 +set td_seed 1 +set td_quit 1 +set td_dbtest HLD2V +timedemo hlbench2"}
+           "exe": "HLDGL.EXE", "args": "-game valve -nosound -width 640 -height 480 +host_framerate 0.02 +gl_vbo 1 +gl_vsync 0 +set td_seed 1 +set td_quit 1 +set td_dbtest HLD2V +timedemo hlbench2"},
+ "FW1":   {"game": "fifthwheel", "what": "Fifth Wheel: 3,000 frames of the autopilot touring its generated world, one tick per frame, vsync off (the game writes its own H/T lines, dgk/bench.h)",
+           "exe": "FWHEEL.EXE", "args": "-nosound -novsync -fixed -autopilot -frames 3000 -dbtest FW1"},
+ "FWP":   {"game": "fifthwheel", "what": "Fifth Wheel's performance probe: T lines FWP-<tris>-<path>[-tex] and FWP-<tris>-d<draws> (triangles, draw calls, texturing, submission paths)",
+           "exe": "FWHEEL.EXE", "args": "-nosound -novsync -probe"}
 }

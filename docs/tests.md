@@ -108,4 +108,6 @@ draws the same frames. The catalogue is `tools/games.json`.
 | HLD2 | Half-Life (WON) `hlbench2`: c1a2, the map with the most monsters, MP5 fire | the first card |
 | HLD1V | HLD1 on Xash3D's VBO path (`gl_vbo 1`): world lightmaps in the second texture unit, one pass (G400/G450: DOS-GL's buffer objects and combine) | HLD1 |
 | HLD2V | HLD2 on the VBO path | HLD2 |
+| FW1 | Fifth Wheel (`FIFTHWHEEL`: its game and the dgk kit on DOS-GL): 3,000 frames of the autopilot touring its generated 4 x 4 km world, one tick per frame, vsync off; no retail data, the files go on C: | the first card |
+| FWP | Fifth Wheel's performance probe: one record per case, `FWP-<tris>-arr`/`-list`/`-imm` (1,000-8,000 triangles through vertex arrays, display lists, immediate mode), `-arr-tex` (textured), `FWP-2000-d<draws>` (50-400 draw calls), and an `FWP` summary; the game writes them itself (`dgk/bench.h`) | none: the records feed Fifth Wheel's budget model (its `docs/perf.md`) |
 
