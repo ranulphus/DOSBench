@@ -115,15 +115,21 @@ the destination) is advisory.
 Output: `out/loopa/<card>/` (`serial.log`, `files/RESULTS.TXT`, `*.png`,
 `diff/`, `programs.json`, `checks.json`).
 
-The game tests (`docs/tests.md`, group `game`) need DOS-GL's Quake builds
-(`make quake` in DOS-GL) and the game fixtures (DOS-GL's
-`tools/quake/fixtures.py`, and `tools/quake/q2record.sh q2bench1` for the
-Quake 2 demo):
+The game tests (`docs/tests.md`, group `game`) need DOS-GL's Quake and
+Half-Life builds (`make quake`, `make halflife` in DOS-GL) and the game
+fixtures (DOS-GL's `tools/quake/fixtures.py`, `tools/quake/q2record.sh
+q2bench1` for the Quake 2 demo, `tools/halflife/fixtures.py` and
+`DEMO=hlbench1 MAP=c0a0` / `DEMO=hlbench2 MAP=c1a2 tools/halflife/run.sh
+record` for the Half-Life demos). Half-Life runs on a 128 MB PC.
 
 ```
 python3 tools/run.py games --card g450                  # every game test
 python3 tools/run.py games --card g450,g400,g200 --tests Q1D1,Q2D1
+python3 tools/run.py games --card g450,g400,g200 --tests HLD1,HLD2
 ```
+
+The game jobs' `RESULTS.TXT` go into the report with `tools/report.py ingest
+out/games/<card>/<game> --source loopa --pc games-<card>`.
 
 One job per card and game (the game's data on D:), running its timedemos in
 turn; then each frame against the first card, and the 8-bit and

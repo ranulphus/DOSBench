@@ -329,20 +329,35 @@ def games_job(card, key, tests, a):
     dosgl = VARS["DOSGL"]
     # The dev container mounts this repository and the fixture cache, not
     # DOS-GL: stage DOS-GL's game builds and games list here.
-    q = rsp_dir = os.path.join(ROOT, "build", "games")
+    hl = key == "halflife"
+    tool = "halflife" if hl else "quake"
+    q = rsp_dir = os.path.join(ROOT, "build", "games", tool)
     os.makedirs(q, exist_ok=True)
-    for f in ("QDOSDGL.EXE", "Q2DGL.EXE", "GAMEX86.DXE", "DOSLFN.COM"):
-        src = os.path.join(dosgl, "build", "quake", f)
+    for f in (("HLDGL.EXE", "EXTRAS.PK3", "DOSLFN.COM") if hl else
+              ("QDOSDGL.EXE", "Q2DGL.EXE", "GAMEX86.DXE", "DOSLFN.COM")):
+        src = os.path.join(dosgl, "build", tool, f)
         if not os.path.exists(src):
-            raise SystemExit("run.py: no %s (DOS-GL: make quake)" % src)
+            raise SystemExit("run.py: no %s (DOS-GL: make %s)" % (src, tool))
         shutil.copyfile(src, os.path.join(q, f))
     gfile = os.path.join(q, "games.json")
-    shutil.copyfile(os.path.join(dosgl, "tools", "quake", "games.json"), gfile)
+    shutil.copyfile(os.path.join(dosgl, "tools", tool, "games.json"), gfile)
     game = json.load(open(gfile))[key]
     out = os.path.join(ROOT, "out", "games", card, key)
-    files, cmds = [], ["D:", "CD \\" + game["cwd"]]
+    files, cmds, extra = [], ["D:", "CD \\" + game["cwd"]], []
     for exe in sorted(set(t["exe"] for t in tests.values())):
         files.append("%s=D:/%s/%s" % (os.path.join(q, exe), game["dir"], exe))
+    if hl:
+        # Half-Life (DOS-GL's tools/halflife): Xash3D's extra data, long file
+        # names, a 128 MB PC; demos recorded by DOS-GL's run.sh record
+        files += ["%s=D:/HL/VALVE/EXTRAS.PK3" % os.path.join(q, "EXTRAS.PK3"),
+                  "%s=D:/HL/DOSLFN.COM" % os.path.join(q, "DOSLFN.COM")]
+        cmds.append("DOSLFN")
+        extra += ["--mem", "128"]
+        for demo in sorted(set(t["demo"] for t in tests.values() if t.get("demo"))):
+            src = os.path.join(CACHE, "fixtures", "games", "hldemos", demo.upper() + ".DEM")
+            if not os.path.exists(src):
+                raise SystemExit("run.py: no %s (DOS-GL: DEMO=%s tools/halflife/run.sh record)" % (src, demo))
+            files.append("%s=D:/HL/VALVE/%s.DEM" % (src, demo.upper()))
     if key == "quake2":
         files += ["%s=D:/QUAKE2/BASEQ2/GAMEX86.DXE" % os.path.join(q, "GAMEX86.DXE"),
                   "%s=D:/QUAKE2/DOSLFN.COM" % os.path.join(q, "DOSLFN.COM")]
@@ -362,7 +377,7 @@ def games_job(card, key, tests, a):
            "--name", "dosbench-%s-%s" % (key, card), "--card", card, "--out", out,
            "--games-file", gfile, "--game", key, "--pre", "SET DGL_EXIT_AFTER=0",
            "--pre", "SET DGL_STATS=1",               # a line a second: long timedemos are not idle
-           "--timeout", str(a.timeout), "--idle", str(a.idle)]
+           "--timeout", str(a.timeout), "--idle", str(a.idle)] + extra
     for f in files:
         cmd += ["--file", f]
     for c in cmds:

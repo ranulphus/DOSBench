@@ -85,13 +85,15 @@ down; `tools/bsp.py` halves the largest textures when a map does not fit).
 
 ## Games (group `game`)
 
-Timedemos of the Quake ports built on DOS-GL (DOS-GL's `tools/quake`: the
-forks `qdos-dosgl` and `q2dos-dosgl`), run by `tools/run.py games` from the
+Timedemos of the Quake ports and Half-Life built on DOS-GL (DOS-GL's
+`tools/quake`: the forks `qdos-dosgl` and `q2dos-dosgl`; `tools/halflife`:
+Xash3D FWGS and hlsdk-portable), run by `tools/run.py games` from the
 owner's game data (local fixtures, never committed). The games write their
-own H and T lines (`-dosbench` in Quake, `td_dbtest` in Quake 2) and save
-frame 200 as `L<ID>.PPM`; game time advances a fixed step per frame
-(`-fixedtime`, `fixedtime 14`), so every run and every card draws the same
-frames. The catalogue is `tools/games.json`.
+own H and T lines (`-dosbench` in Quake, `td_dbtest` in Quake 2 and
+Half-Life) and save frame 200 as `L<ID>.PPM`; game time advances a fixed
+step per frame (`-fixedtime`, `fixedtime 14`, `host_framerate 0.02`, with
+Half-Life's random numbers seeded by `td_seed`), so every run and every card
+draws the same frames. The catalogue is `tools/games.json`.
 
 | ID | Timedemo | Checked against |
 |---|---|---|
@@ -102,4 +104,6 @@ frames. The catalogue is `tools/games.json`.
 | Q2D1 | Quake 2 `q2bench1` (base1 walked and fired through; recorded by DOS-GL's `tools/quake/q2record.sh`) | the first card |
 | Q2D1M | the same with multitexture lightmaps | Q2D1; skipped until DOS-GL has `GL_ARB_multitexture` |
 | Q2D1P | the same with 8-bit paletted textures | Q2D1, looser: Quake 2 re-quantises its textures to the palette |
+| HLD1 | Half-Life (WON) `hlbench1`: the c0a0 tram ride, world geometry (recorded by DOS-GL's `tools/halflife/run.sh record`); 128 MB PC, no sound | the first card |
+| HLD2 | Half-Life (WON) `hlbench2`: c1a2, the map with the most monsters, MP5 fire | the first card |
 

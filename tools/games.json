@@ -1,5 +1,5 @@
 {
- "_about": "Game tests (group game): each is a timedemo of a DOS-GL build of a Quake port (DOS-GL's tools/quake builds them) writing DOSBench H/T lines itself (-dosbench / td_dbtest) and its frame as L<ID>.PPM. game: the key in DOS-GL's tools/quake/games.json (the D: disk); needs: a GL feature DOS-GL must advertise first (mtex: GL_ARB_multitexture, plan Q5); ref: the test whose frame this one is checked against (game-pal-vs-rgba, game-mtex-vs-2pass). Retail data stays in the local fixtures.",
+ "_about": "Game tests (group game): each is a timedemo of a DOS-GL build of a Quake port or Half-Life (DOS-GL's tools/quake and tools/halflife build them) writing DOSBench H/T lines itself (-dosbench / td_dbtest) and its frame as L<ID>.PPM. game: the key in DOS-GL's tools/quake/games.json or tools/halflife/games.json (the D: disk); needs: a GL feature DOS-GL must advertise first (mtex: GL_ARB_multitexture, plan Q5); ref: the test whose frame this one is checked against (game-pal-vs-rgba, game-mtex-vs-2pass). Retail data stays in the local fixtures.",
  "Q1D1":  {"game": "quake", "what": "GLQuake timedemo demo1 (retail)",
            "exe": "QDOSDGL.EXE", "args": "-nosound -nocdaudio -nolan -width 640 -height 480 -fixedtime -tdquit -dosbench C:/OUT Q1D1 +timedemo demo1"},
  "Q1D1M": {"game": "quake", "what": "GLQuake demo1, multitexture lightmaps", "needs": "mtex", "ref": "Q1D1",
@@ -13,5 +13,9 @@
  "Q2D1M": {"game": "quake2", "what": "Quake 2 q2bench1, multitexture lightmaps", "demo": "q2bench1", "needs": "mtex", "ref": "Q2D1",
            "exe": "Q2DGL.EXE", "args": "+set gl_mode 3 +set s_initsound 0 +set timedemo 1 +set fixedtime 14 +set td_quit 1 +set gl_ext_multitexture 1 +set td_dbtest Q2D1M +demomap q2bench1.dm2"},
  "Q2D1P": {"game": "quake2", "what": "Quake 2 q2bench1, 8-bit paletted textures", "demo": "q2bench1", "ref": "Q2D1",
-           "exe": "Q2DGL.EXE", "args": "+set gl_mode 3 +set s_initsound 0 +set timedemo 1 +set fixedtime 14 +set td_quit 1 +set gl_ext_palettedtexture 1 +set td_dbtest Q2D1P +demomap q2bench1.dm2"}
+           "exe": "Q2DGL.EXE", "args": "+set gl_mode 3 +set s_initsound 0 +set timedemo 1 +set fixedtime 14 +set td_quit 1 +set gl_ext_palettedtexture 1 +set td_dbtest Q2D1P +demomap q2bench1.dm2"},
+ "HLD1":  {"game": "halflife", "what": "Half-Life (WON) timedemo hlbench1: the c0a0 tram ride, world geometry (recorded by DOS-GL's run.sh record)", "demo": "hlbench1",
+           "exe": "HLDGL.EXE", "args": "-game valve -nosound -width 640 -height 480 +host_framerate 0.02 +gl_vsync 0 +set td_seed 1 +set td_quit 1 +set td_dbtest HLD1 +timedemo hlbench1"},
+ "HLD2":  {"game": "halflife", "what": "Half-Life (WON) timedemo hlbench2: c1a2, monsters and MP5 fire (recorded by DOS-GL's run.sh record)", "demo": "hlbench2",
+           "exe": "HLDGL.EXE", "args": "-game valve -nosound -width 640 -height 480 +host_framerate 0.02 +gl_vsync 0 +set td_seed 1 +set td_quit 1 +set td_dbtest HLD2 +timedemo hlbench2"}
 }
