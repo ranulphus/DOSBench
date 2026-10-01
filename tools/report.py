@@ -29,29 +29,17 @@ RESULTS = os.path.join(ROOT, "results")
 
 NUMERIC = re.compile(r"^-?\d+(\.\d+)?$")
 
-# The figure a test is judged by, per test-id prefix (longest match wins).
-PRIMARY = [
-    ("S1", "mpix_s", "Mpixels/s"),
-    ("S2", "ktris_s", "Ktris/s"),
-    ("S3UPL", "mtexel_s", "Mtexels/s"),
-    ("S3SUB", "mtexel_s", "Mtexels/s"),
-    ("S3WS", "fps", "fps"),
-    ("S4", "ktris_s", "Ktris/s"),
-    ("M", "fps", "fps"),
-    ("L", "fps", "fps"),
-    ("B0", "fps", "fps"),
-    ("Q1", "fps", "fps"),
-    ("Q2", "fps", "fps"),
-]
-GROUPS = [("basic", "Basic"), ("synth", "Synthetic"), ("model", "Models"), ("level", "Level"), ("game", "Games")]
+# What each test is judged by, its group and the run order: the registry
+# (src/core/tests.json through tools/registry.py). Tests it does not hold
+# (the games' timedemos) are judged by fps and listed under their own group.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import registry  # noqa: E402
+
+GROUPS = [(g["id"], g["title"]) for g in registry.load()["groups"]] + [("game", registry.group_title("game"))]
 
 
 def primary(test):
-    best = ("fps", "fps", 0)
-    for prefix, key, label in PRIMARY:
-        if test.startswith(prefix) and len(prefix) > best[2]:
-            best = (key, label, len(prefix))
-    return best[0], best[1]
+    return registry.primary(test)
 
 
 def parse_line(line):
@@ -176,16 +164,16 @@ def latest_by(recs):
 
 
 def derived(best, tgt, mode):
-    """State-change cost: (T or B frame time - D frame time) / changes, in microseconds."""
+    """State-change cost: (test frame time - its baseline's) / changes, in
+    microseconds, for the registry's derive pairs (S4T/S4B against S4D)."""
     out = {}
-    for k in ("1", "16"):
-        d = best.get((tgt, mode, "S4D" + k))
-        for what in ("T", "B"):
-            r = best.get((tgt, mode, "S4%s%s" % (what, k)))
-            if d and r:
-                changes = float(str(r.get("changes", 0)) or 0)
-                if changes:
-                    out["S4%s%s" % (what, k)] = (r["avg_ms"] - d["avg_ms"]) * 1000.0 / changes
+    for test, base in registry.derived_pairs().items():
+        d = best.get((tgt, mode, base))
+        r = best.get((tgt, mode, test))
+        if d and r:
+            changes = float(str(r.get("changes", 0)) or 0)
+            if changes:
+                out[test] = (r["avg_ms"] - d["avg_ms"]) * 1000.0 / changes
     return out
 
 
@@ -208,9 +196,8 @@ def matrix(recs):
     for k in best:
         if k[2] not in tests:
             tests.append(k[2])
-    order = {g: i for i, (g, _) in enumerate(GROUPS)}
     group_of = {r.get("test"): r.get("group") for r in best.values()}
-    tests.sort(key=lambda t: (order.get(group_of.get(t), 9), t))
+    tests.sort(key=lambda t: (registry.order_index(t), t))       # run order; games after, by id
     return best, targets, modes, tests, group_of
 
 

@@ -1,0 +1,70 @@
+{
+ "_about": "DOSBench's test registry: the one list both programs, the menu, tools/report.py and tools/run.py are built from (tools/registry.py generates build/gen/registry.h). File order is run order. A suite is a heading over the tests that name it as parent (its phases); a phase keeps its own test id and T line. impl names the code that draws it (a test_impl in src/core); param and file go to that code unchanged. metric is the T-line key a test is judged by, unit how it is shown; weight > 0 puts a test in the score.",
+ "version": 2,
+ "score": {"title": "DOSBench score", "scale": 100, "mean": "geometric", "metric": "fps", "scorever": 1,
+           "_why": "100 x the geometric mean of the scored tests' average frame rates: no reference machine, and one slow scene cannot dominate it"},
+ "groups": [
+  {"id": "basic", "title": "Basic check"},
+  {"id": "scene", "title": "Game scenes"},
+  {"id": "model", "title": "Models"},
+  {"id": "synth", "title": "Feature tests"},
+  {"id": "level", "title": "Quake level"}
+ ],
+ "presets": [
+  {"id": "full", "title": "Full", "tests": "scene,model,synth"},
+  {"id": "scenes", "title": "Scenes only", "tests": "scene"},
+  {"id": "features", "title": "Features only", "tests": "synth"}
+ ],
+ "tests": [
+  {"id": "B0TRI", "group": "basic", "impl": "basic", "title": "Basic check", "what": "clear, one Gouraud triangle, one textured quad"},
+
+  {"id": "GALLERY", "group": "model", "suite": true, "title": "Model gallery", "what": "static meshes from 0.7k to 69k triangles, orbited, textured and lit"},
+  {"id": "M1TP4K", "parent": "GALLERY", "impl": "model", "file": "TPOT4K.DBS", "title": "Utah teapot, 4.5k triangles", "what": "Utah teapot, 4.5k triangles, Gouraud"},
+  {"id": "M1TP16", "parent": "GALLERY", "impl": "model", "file": "TPOT16K.DBS", "title": "Utah teapot, 16k triangles", "what": "Utah teapot, 16k triangles, Gouraud"},
+  {"id": "M1TP64", "parent": "GALLERY", "impl": "model", "file": "TPOT64K.DBS", "title": "Utah teapot, 65k triangles", "what": "Utah teapot, 65k triangles, Gouraud"},
+  {"id": "M2BUNY", "parent": "GALLERY", "impl": "model", "file": "BUNNY.DBS", "title": "Stanford bunny, 69k triangles", "what": "Stanford bunny, 69k triangles"},
+  {"id": "M2DRGN", "parent": "GALLERY", "impl": "model", "file": "DRAGON.DBS", "title": "Stanford dragon, 48k triangles", "what": "Stanford dragon, 48k triangles"},
+  {"id": "M3LANT", "parent": "GALLERY", "impl": "model", "file": "LANTERN.DBS", "title": "Lantern, 5.4k triangles", "what": "Lantern, 5.4k triangles, textured"},
+  {"id": "M3SUZ", "parent": "GALLERY", "impl": "model", "file": "SUZANNE.DBS", "title": "Suzanne, 3.9k triangles", "what": "Suzanne, 3.9k triangles, textured"},
+  {"id": "M3AVOC", "parent": "GALLERY", "impl": "model", "file": "AVOCADO.DBS", "title": "Avocado, 682 triangles", "what": "Avocado, 682 triangles, textured"},
+
+  {"id": "FILL", "group": "synth", "suite": true, "headline": "S1TEXB", "title": "Fill rate", "what": "pixels per second: 8 full-screen layers, drawn six ways"},
+  {"id": "S1FLAT", "parent": "FILL", "impl": "fill", "param": 0, "metric": "mpix_s", "unit": "Mpix/s", "title": "Flat colour", "what": "fill: flat colour layers"},
+  {"id": "S1GOUR", "parent": "FILL", "impl": "fill", "param": 1, "metric": "mpix_s", "unit": "Mpix/s", "title": "Gouraud", "what": "fill: Gouraud layers"},
+  {"id": "S1TEXP", "parent": "FILL", "impl": "fill", "param": 2, "metric": "mpix_s", "unit": "Mpix/s", "title": "Textured, point sampled", "what": "fill: textured, point sampled"},
+  {"id": "S1TEXB", "parent": "FILL", "impl": "fill", "param": 3, "metric": "mpix_s", "unit": "Mpix/s", "title": "Textured, bilinear", "what": "fill: textured, bilinear"},
+  {"id": "S1BLND", "parent": "FILL", "impl": "fill", "param": 4, "metric": "mpix_s", "unit": "Mpix/s", "title": "Alpha blended", "what": "fill: textured, alpha blended"},
+  {"id": "S1FOG", "parent": "FILL", "impl": "fill", "param": 5, "metric": "mpix_s", "unit": "Mpix/s", "title": "Fogged", "what": "fill: textured, fogged"},
+
+  {"id": "TRIS", "group": "synth", "suite": true, "headline": "S2M16", "title": "Triangle rate", "what": "triangles per second: small triangles by size, layout and submission path"},
+  {"id": "S2L4", "parent": "TRIS", "impl": "tri", "param": 4, "metric": "ktris_s", "unit": "Ktris/s", "title": "4 px, independent", "what": "triangles: 4 px, independent"},
+  {"id": "S2L16", "parent": "TRIS", "impl": "tri", "param": 16, "metric": "ktris_s", "unit": "Ktris/s", "title": "16 px, independent", "what": "triangles: 16 px, independent"},
+  {"id": "S2L64", "parent": "TRIS", "impl": "tri", "param": 64, "metric": "ktris_s", "unit": "Ktris/s", "title": "64 px, independent", "what": "triangles: 64 px, independent"},
+  {"id": "S2M4", "parent": "TRIS", "impl": "tri", "param": 1004, "metric": "ktris_s", "unit": "Ktris/s", "title": "4 px, shared-vertex mesh", "what": "triangles: 4 px, shared-vertex mesh"},
+  {"id": "S2M16", "parent": "TRIS", "impl": "tri", "param": 1016, "metric": "ktris_s", "unit": "Ktris/s", "title": "16 px, shared-vertex mesh", "what": "triangles: 16 px, shared-vertex mesh"},
+  {"id": "S2M64", "parent": "TRIS", "impl": "tri", "param": 1064, "metric": "ktris_s", "unit": "Ktris/s", "title": "64 px, shared-vertex mesh", "what": "triangles: 64 px, shared-vertex mesh"},
+  {"id": "S2T16", "parent": "TRIS", "impl": "tri", "param": 11016, "metric": "ktris_s", "unit": "Ktris/s", "title": "16 px mesh, textured", "what": "triangles: 16 px mesh, textured bilinear"},
+  {"id": "S2SA16", "parent": "TRIS", "impl": "tri", "param": 101016, "gl_only": true, "metric": "ktris_s", "unit": "Ktris/s", "title": "16 px mesh, vertex arrays", "what": "triangles: 16 px mesh, GL vertex arrays"},
+  {"id": "S2SL16", "parent": "TRIS", "impl": "tri", "param": 201016, "gl_only": true, "metric": "ktris_s", "unit": "Ktris/s", "title": "16 px mesh, display lists", "what": "triangles: 16 px mesh, GL display lists"},
+  {"id": "S2SI16", "parent": "TRIS", "impl": "tri", "param": 301016, "gl_only": true, "metric": "ktris_s", "unit": "Ktris/s", "title": "16 px mesh, immediate mode", "what": "triangles: 16 px mesh, GL immediate mode"},
+
+  {"id": "TEXTURE", "group": "synth", "suite": true, "headline": "S3UPL", "title": "Texture memory", "what": "uploads, sub-image updates, and working sets beyond 2 MB"},
+  {"id": "S3UPL", "parent": "TEXTURE", "impl": "tex", "param": 0, "metric": "mtexel_s", "unit": "Mtex/s", "title": "Upload, 256x256", "what": "texture upload: 256x256 replaced and drawn"},
+  {"id": "S3WS8", "parent": "TEXTURE", "impl": "tex", "param": 8, "title": "Working set, 8 textures", "what": "texture working set: 8 x 256x256 mipmapped"},
+  {"id": "S3WS24", "parent": "TEXTURE", "impl": "tex", "param": 24, "title": "Working set, 24 textures", "what": "texture working set: 24 x 256x256 mipmapped"},
+  {"id": "S3SUB", "parent": "TEXTURE", "impl": "sub", "param": 0, "gl_only": true, "metric": "mtexel_s", "unit": "Mtex/s", "title": "Sub-image updates", "what": "sub-image: 16 32x32 rectangles of a 128x128 texture, then drawn"},
+  {"id": "S3SUBI", "parent": "TEXTURE", "impl": "sub", "param": 1, "gl_only": true, "metric": "mtexel_s", "unit": "Mtex/s", "title": "Sub-image, interleaved", "what": "sub-image: 16 rectangles, each drawn right after its update"},
+
+  {"id": "STATE", "group": "synth", "suite": true, "headline": "S4D16", "title": "State changes", "what": "the cost of draw calls, texture changes and blend changes"},
+  {"id": "S4D1", "parent": "STATE", "impl": "state", "param": 1, "metric": "ktris_s", "unit": "Ktris/s", "title": "A draw call per triangle", "what": "state: a draw call per triangle"},
+  {"id": "S4D16", "parent": "STATE", "impl": "state", "param": 16, "metric": "ktris_s", "unit": "Ktris/s", "title": "A draw call per 16 triangles", "what": "state: a draw call per 16 triangles"},
+  {"id": "S4T1", "parent": "STATE", "impl": "state", "param": 1001, "metric": "ktris_s", "unit": "Ktris/s", "derive": "S4D1", "title": "Texture change per triangle", "what": "state: texture change per triangle"},
+  {"id": "S4T16", "parent": "STATE", "impl": "state", "param": 1016, "metric": "ktris_s", "unit": "Ktris/s", "derive": "S4D16", "title": "Texture change per 16 triangles", "what": "state: texture change per 16 triangles"},
+  {"id": "S4B1", "parent": "STATE", "impl": "state", "param": 2001, "metric": "ktris_s", "unit": "Ktris/s", "derive": "S4D1", "title": "Blend change per triangle", "what": "state: blend change per triangle"},
+  {"id": "S4B16", "parent": "STATE", "impl": "state", "param": 2016, "metric": "ktris_s", "unit": "Ktris/s", "derive": "S4D16", "title": "Blend change per 16 triangles", "what": "state: blend change per 16 triangles"},
+
+  {"id": "LQLEVEL", "group": "level", "suite": true, "title": "Quake level", "what": "LibreQuake e0m1 fly-through: BSP visibility, lightmaps, fences, water"},
+  {"id": "L1LQ2P", "parent": "LQLEVEL", "impl": "level", "param": 0, "file": "LQE0M1.DBS", "title": "Two-pass lightmaps", "what": "LibreQuake e0m1 fly-through, two-pass lightmaps"},
+  {"id": "L1LQBK", "parent": "LQLEVEL", "impl": "level", "param": 1, "file": "LQE0M1.DBS", "title": "Baked vertex lighting", "what": "LibreQuake e0m1 fly-through, baked vertex lighting"}
+ ]
+}

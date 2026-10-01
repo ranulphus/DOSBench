@@ -69,15 +69,5 @@ static void model_done(tctx *t)
     t->p = NULL;
 }
 
-#define MODEL(id, file, what) { id, "model", what, T_DATA, 0, file, model_setup, model_frame, model_done }
-const test_def model_tests[] = {
-    MODEL("M1TP4K", "TPOT4K.DBS", "Utah teapot, 4.5k triangles, Gouraud"),
-    MODEL("M1TP16", "TPOT16K.DBS", "Utah teapot, 16k triangles, Gouraud"),
-    MODEL("M1TP64", "TPOT64K.DBS", "Utah teapot, 65k triangles, Gouraud"),
-    MODEL("M2BUNY", "BUNNY.DBS", "Stanford bunny, 69k triangles"),
-    MODEL("M2DRGN", "DRAGON.DBS", "Stanford dragon, 48k triangles"),
-    MODEL("M3LANT", "LANTERN.DBS", "Lantern, 5.4k triangles, textured"),
-    MODEL("M3SUZ", "SUZANNE.DBS", "Suzanne, 3.9k triangles, textured"),
-    MODEL("M3AVOC", "AVOCADO.DBS", "Avocado, 682 triangles, textured"),
-    { NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL }
-};
+/* The registry's model tests (src/core/tests.json): file names the scene. */
+const test_impl impl_model = { model_setup, model_frame, model_done };

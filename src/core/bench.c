@@ -34,8 +34,6 @@ static const char *modes_arg = "640x480";
 static int list_only;
 static char run_id[12];
 
-static const test_def *const tables[] = { synth_tests, model_tests, level_tests, NULL };
-
 static int is_glide(void)
 {
     return !strcmp(rb_get_info()->api, "glide");
@@ -140,19 +138,6 @@ static void load_tests_arg(void)
     tests_arg = tests_buf;
 }
 
-static int selected(const test_def *d)
-{
-    char buf[1024], *tok;
-    snprintf(buf, sizeof buf, "%s", tests_arg);
-    for (tok = strtok(buf, ","); tok; tok = strtok(NULL, ",")) {
-        size_t n = strlen(tok);
-        if (!strcmp(tok, "all") || !strcmp(tok, d->group) || !strcmp(tok, d->id) ||
-            (n <= 3 && !strncmp(tok, d->id, n)))
-            return 1;
-    }
-    return 0;
-}
-
 static const char *submit_name(int s)
 {
     return s == RB_SUBMIT_LISTS ? "lists" : s == RB_SUBMIT_IMMEDIATE ? "immediate" : "arrays";
@@ -175,10 +160,13 @@ static void result(const tctx *t, const char *status, int n, double total_ms, co
             k += snprintf(rates + k, sizeof rates - k, " mtexel_s=%.2f", t->texels * n / secs / 1e6);
         snprintf(rates + k, sizeof rates - k, " tex_kb_frame=%.1f", tex_bytes / 1024.0 / n);
     }
-    res_line("T run=%s prog=%s tag=%c api=%s mode=%dx%d test=%s group=%s status=%s frames=%d secs=%.3f "
+    char parent[24] = "";
+    if (d->parent[0])                   /* a phase of a suite */
+        snprintf(parent, sizeof parent, " parent=%s", d->parent);
+    res_line("T run=%s prog=%s tag=%c api=%s mode=%dx%d test=%s group=%s%s status=%s frames=%d secs=%.3f "
              "fps=%.2f avg_ms=%.3f med_ms=%.3f p99_ms=%.3f min_ms=%.3f max_ms=%.3f submit_ms=%.3f "
              "tris_frame=%.0f%s crc=%08lx%s%s",
-             run_id, DB_PROG, db.tag, rb_get_info()->api, db.w, db.h, d->id, d->group, status, n, secs,
+             run_id, DB_PROG, db.tag, rb_get_info()->api, db.w, db.h, d->id, d->group, parent, status, n, secs,
              s ? s->fps : 0.0, s ? s->avg_ms : 0.0, s ? s->med_ms : 0.0, s ? s->p99_ms : 0.0,
              s ? s->min_ms : 0.0, s ? s->max_ms : 0.0, submit_ms, t->tris, rates, (unsigned long)crc,
              t->note[0] ? " " : "", t->note);
@@ -201,7 +189,7 @@ static void run_test(const test_def *d)
         result(&t, "skip", 0, 0, NULL, 0, 0, 0);
         return;
     }
-    rc = d->setup(&t);
+    rc = d->impl->setup(&t);
     if (rc != 0) {
         hx_log("HX-TEST %s %s %s", d->id, rc > 0 ? "SKIP" : "FAIL", t.note);
         if (rc < 0)
@@ -216,11 +204,11 @@ static void run_test(const test_def *d)
     if (!ft || !sub) {
         free(ft); free(sub);
         hx_test(d->id, 0, "out of memory");
-        if (d->done) d->done(&t);
+        if (d->impl->done) d->impl->done(&t);
         return;
     }
     for (f = 0; f < db.warm; f++) {
-        d->frame(&t, f);
+        d->impl->frame(&t, f);
         rb_swap();
     }
     rb_finish();
@@ -229,7 +217,7 @@ static void run_test(const test_def *d)
     t0 = prev = tmr_now();
     for (;;) {
         a = tmr_now();
-        d->frame(&t, n);
+        d->impl->frame(&t, n);
         b = tmr_now();
         rb_swap();
         c = tmr_now();
@@ -250,7 +238,7 @@ static void run_test(const test_def *d)
     if (db.shots && db.w == db.shot_w && db.h == db.shot_h) {
         long bytes = (long)db.w * db.h * 3;
         uint8_t *rgb = (uint8_t *)malloc((size_t)bytes);
-        d->frame(&t, t.capture_frame);
+        d->impl->frame(&t, t.capture_frame);
         if (rgb && rb_read(rgb) == 0) {
             char name[16];
             snprintf(name, sizeof name, "%c%s", db.tag, d->id);
@@ -270,7 +258,7 @@ static void run_test(const test_def *d)
             char name[16];
             if (t.frames > 0)
                 fr %= t.frames;
-            d->frame(&t, fr);
+            d->impl->frame(&t, fr);
             snprintf(name, sizeof name, "%c%s%d", db.tag, d->id, k++);
             if (rb_read(rgb) == 0)
                 hx_save_ppm(name, db.w, db.h, rgb);
@@ -286,15 +274,15 @@ static void run_test(const test_def *d)
     hx_test(d->id, 1, "frames=%d fps=%.2f", n, s.fps);
     free(ft);
     free(sub);
-    if (d->done)
-        d->done(&t);
+    if (d->impl->done)
+        d->impl->done(&t);
 }
 
 static int run_mode(int w, int h, int optional)
 {
     char err[128] = "", impl[64], card[40], disp[16];
     const rb_info *in;
-    int ti, i;
+    const test_def *d;
     if (rb_open(w, h, db.vsync, err, sizeof err) < 0) {
         if (optional) {                         /* --modes all: a size this card cannot show */
             hx_log("HX-STAT skip mode %dx%d: %s", w, h, err);
@@ -320,10 +308,9 @@ static int run_mode(int w, int h, int optional)
              submit_name(db.submit), tmr_source(), tmr_hz() / 1e6, in->tex_mem / 1024, db.quick, disp,
              in->fit[0] ? in->fit : "?");
     rb_set_submit(db.submit);
-    for (ti = 0; tables[ti]; ti++)
-        for (i = 0; tables[ti][i].id; i++)
-            if (selected(&tables[ti][i]))
-                run_test(&tables[ti][i]);
+    for (d = db_tests; d->id; d++)              /* registry order */
+        if (reg_selected(d, tests_arg))
+            run_test(d);
     rb_close();
     return 0;
 }
@@ -413,11 +400,10 @@ int main(int argc, char **argv)
         db.warm = 1;
         db.min_frames = db.max_frames = 3;
     }
-    if (list_only) {
-        int ti;
-        for (ti = 0; tables[ti]; ti++)
-            for (i = 0; tables[ti][i].id; i++)
-                hx_log("%-8s %-6s %s", tables[ti][i].id, tables[ti][i].group, tables[ti][i].what);
+    if (list_only) {                            /* the registry, in run order */
+        const test_def *d;
+        for (d = db_tests; d->id; d++)
+            hx_log("%-8s %-6s %-8s %s", d->id, d->group, d->flags & T_SUITE ? "suite" : d->parent, d->what);
         hx_done(0);
     }
     if (tmr_init() < 0) {
@@ -433,7 +419,7 @@ int main(int argc, char **argv)
     if (res_open(db.out) < 0)
         hx_log("cannot write %s\\RESULTS.TXT; results go to COM1 only", db.out);
     {
-        /* Parse every mode first: the test selection uses strtok too. */
+        /* Parse every mode first (strtok). */
         char buf[160], *tok;
         int mw[16], mh[16], nm = 0, all = !strcmp(modes_arg, "all");
         /* all: the ten sizes; a card that cannot show one skips it. */

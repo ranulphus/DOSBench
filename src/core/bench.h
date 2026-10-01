@@ -40,24 +40,45 @@ typedef struct tctx {
     void *p;                    /* test-private state */
 } tctx;
 
+/* The code that draws a test (synth.c, model.c, level.c export these). */
+typedef struct test_impl {
+    int  (*setup)(tctx *t);     /* 0 ok, 1 skip (t->note says why), <0 fail */
+    void (*frame)(tctx *t, int f);
+    void (*done)(tctx *t);
+} test_impl;
+
+/* A row of the registry (src/core/tests.json, through build/gen/registry.h,
+ * in run order): a test, or a suite heading over the tests that name it as
+ * their parent (its phases). */
 typedef struct test_def {
     const char *id;             /* <= 7 characters: image names are 8.3 */
-    const char *group;          /* synth, model, level */
+    const char *group;          /* basic, scene, model, synth, level */
+    const char *parent;         /* the suite a phase belongs to, or "" */
+    const char *title;          /* short name, for the screen */
     const char *what;
     int flags;
     int param;
     const char *file;           /* scene file, for data-driven tests */
-    int  (*setup)(tctx *t);     /* 0 ok, 1 skip (t->note says why), <0 fail */
-    void (*frame)(tctx *t, int f);
-    void (*done)(tctx *t);
+    const char *metric;         /* the T-line key it is judged by */
+    const char *unit;
+    int weight;                 /* > 0: in the score */
+    const char *headline;       /* suites: the phase shown for the suite */
+    const test_impl *impl;      /* NULL for a suite */
 } test_def;
 
-enum { T_GL_ONLY = 1, T_DATA = 2 };
+enum { T_GL_ONLY = 1, T_DATA = 2, T_SUITE = 4 };
 
-/* Test tables (NULL-terminated by a zero id). */
-extern const test_def synth_tests[];
-extern const test_def model_tests[];
-extern const test_def level_tests[];
+typedef struct { const char *id, *title, *tests; } db_preset;
+
+/* registry.c: every row, ending with a zero id; the presets likewise. */
+extern const test_def db_tests[];
+extern const db_preset db_presets[];
+
+/* select.c: whether a test runs for a --tests list: all, a preset, a group,
+ * a suite (its phases), an id, or an id prefix of up to 3 characters. */
+int reg_selected(const test_def *d, const char *list);
+int reg_suite_used(const test_def *suite, const char *list);
+int reg_count(const char *list);         /* tests a list runs */
 
 /* Helpers shared by the tests. */
 void db_state_default(rb_state *s);             /* depth on, no blend, no texture */

@@ -13,10 +13,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct { const char *id, *group, *what; int gl_only; } menu_test;
-#include "tests_list.h"
+typedef struct { const char *id, *group, *what; int gl_only; const char *metric, *unit; } menu_test;
+/* The test catalogue: the registry (src/core/tests.json), in run order. */
+static const menu_test menu_tests[] = {
+#define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, derive, title, what) \
+    { id, group, what, (flags) & 1, metric, unit },
+#include "registry.h"
+    { 0, 0, 0, 0, 0, 0 }
+};
 
-#define MAX_TESTS 64
+#define MAX_TESTS 96
 #define LIST_TOP 3
 #define LIST_ROWS 18
 
@@ -220,12 +226,18 @@ static res_t res[400];
 static int nres;
 static char tags[8];
 
+/* The T-line key a test is judged by, from the registry; NULL for frame rates. */
 static const char *metric_key(const char *test, const char **unit)
 {
-    if (!strncmp(test, "S1", 2)) { *unit = "Mpix/s"; return "mpix_s"; }
-    if (!strncmp(test, "S2", 2) || !strncmp(test, "S4", 2)) { *unit = "Ktri/s"; return "ktris_s"; }
-    if (!strncmp(test, "S3UPL", 5)) { *unit = "Mtex/s"; return "mtexel_s"; }
+    int i;
     *unit = "";
+    for (i = 0; menu_tests[i].id; i++)
+        if (!strcmp(menu_tests[i].id, test)) {
+            if (!strcmp(menu_tests[i].metric, "fps"))
+                return NULL;
+            *unit = menu_tests[i].unit;
+            return menu_tests[i].metric;
+        }
     return NULL;
 }
 

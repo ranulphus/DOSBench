@@ -498,35 +498,10 @@ static void state_frame(tctx *t, int f)
     rb_tex_bind(NULL);
 }
 
-#define SYN(id, grp, what, flags, param, setup, frame) { id, grp, what, flags, param, NULL, setup, frame, free_synth }
-const test_def synth_tests[] = {
-    SYN("B0TRI", "basic", "clear, one Gouraud triangle, one textured quad", 0, 0, basic_setup, basic_frame),
-    SYN("S1FLAT", "synth", "fill: flat colour layers", 0, F_FLAT, fill_setup, fill_frame),
-    SYN("S1GOUR", "synth", "fill: Gouraud layers", 0, F_GOURAUD, fill_setup, fill_frame),
-    SYN("S1TEXP", "synth", "fill: textured, point sampled", 0, F_POINT, fill_setup, fill_frame),
-    SYN("S1TEXB", "synth", "fill: textured, bilinear", 0, F_BILINEAR, fill_setup, fill_frame),
-    SYN("S1BLND", "synth", "fill: textured, alpha blended", 0, F_BLEND, fill_setup, fill_frame),
-    SYN("S1FOG", "synth", "fill: textured, fogged", 0, F_FOG, fill_setup, fill_frame),
-    SYN("S2L4", "synth", "triangles: 4 px, independent", 0, 4, tri_setup, tri_frame),
-    SYN("S2L16", "synth", "triangles: 16 px, independent", 0, 16, tri_setup, tri_frame),
-    SYN("S2L64", "synth", "triangles: 64 px, independent", 0, 64, tri_setup, tri_frame),
-    SYN("S2M4", "synth", "triangles: 4 px, shared-vertex mesh", 0, 1004, tri_setup, tri_frame),
-    SYN("S2M16", "synth", "triangles: 16 px, shared-vertex mesh", 0, 1016, tri_setup, tri_frame),
-    SYN("S2M64", "synth", "triangles: 64 px, shared-vertex mesh", 0, 1064, tri_setup, tri_frame),
-    SYN("S2T16", "synth", "triangles: 16 px mesh, textured bilinear", 0, 11016, tri_setup, tri_frame),
-    SYN("S2SA16", "synth", "triangles: 16 px mesh, GL vertex arrays", T_GL_ONLY, 101016, tri_setup, tri_frame),
-    SYN("S2SL16", "synth", "triangles: 16 px mesh, GL display lists", T_GL_ONLY, 201016, tri_setup, tri_frame),
-    SYN("S2SI16", "synth", "triangles: 16 px mesh, GL immediate mode", T_GL_ONLY, 301016, tri_setup, tri_frame),
-    SYN("S3UPL", "synth", "texture upload: 256x256 replaced and drawn", 0, 0, tex_setup, tex_frame),
-    SYN("S3WS8", "synth", "texture working set: 8 x 256x256 mipmapped", 0, 8, tex_setup, tex_frame),
-    SYN("S3WS24", "synth", "texture working set: 24 x 256x256 mipmapped", 0, 24, tex_setup, tex_frame),
-    SYN("S3SUB", "synth", "sub-image: 16 32x32 rectangles of a 128x128 texture, then drawn", T_GL_ONLY, 0, sub_setup, sub_frame),
-    SYN("S3SUBI", "synth", "sub-image: 16 rectangles, each drawn right after its update", T_GL_ONLY, 1, sub_setup, sub_frame),
-    SYN("S4D1", "synth", "state: a draw call per triangle", 0, 1, state_setup, state_frame),
-    SYN("S4D16", "synth", "state: a draw call per 16 triangles", 0, 16, state_setup, state_frame),
-    SYN("S4T1", "synth", "state: texture change per triangle", 0, 1001, state_setup, state_frame),
-    SYN("S4T16", "synth", "state: texture change per 16 triangles", 0, 1016, state_setup, state_frame),
-    SYN("S4B1", "synth", "state: blend change per triangle", 0, 2001, state_setup, state_frame),
-    SYN("S4B16", "synth", "state: blend change per 16 triangles", 0, 2016, state_setup, state_frame),
-    { NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL }
-};
+/* What the registry (src/core/tests.json) runs: param picks the variant. */
+const test_impl impl_basic = { basic_setup, basic_frame, free_synth };
+const test_impl impl_fill = { fill_setup, fill_frame, free_synth };
+const test_impl impl_tri = { tri_setup, tri_frame, free_synth };
+const test_impl impl_tex = { tex_setup, tex_frame, free_synth };
+const test_impl impl_sub = { sub_setup, sub_frame, free_synth };
+const test_impl impl_state = { state_setup, state_frame, free_synth };

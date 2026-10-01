@@ -384,9 +384,5 @@ static void level_done(tctx *t)
     t->p = NULL;
 }
 
-#define LEVEL(id, file, param, what) { id, "level", what, T_DATA, param, file, level_setup, level_frame, level_done }
-const test_def level_tests[] = {
-    LEVEL("L1LQ2P", "LQE0M1.DBS", 0, "LibreQuake e0m1 fly-through, two-pass lightmaps"),
-    LEVEL("L1LQBK", "LQE0M1.DBS", 1, "LibreQuake e0m1 fly-through, baked vertex lighting"),
-    { NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL }
-};
+/* The registry's level tests (src/core/tests.json): param 0 two-pass lightmaps, 1 baked. */
+const test_impl impl_level = { level_setup, level_frame, level_done };
