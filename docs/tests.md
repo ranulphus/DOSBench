@@ -4,9 +4,16 @@ Every test runs through both APIs from one portable core (`src/core/`), with
 the render backend (`src/backend/rb.h`) the only difference. IDs are at most
 seven characters because saved frames are named `<tag><id>.PPM` (8.3).
 
-`BENCHG --list` or `BENCHGL --list` prints the table. `--tests` takes IDs,
-three-character prefixes (`S2M`), groups (`basic`, `synth`, `model`,
-`level`) or `all`, comma-separated; `--tests-from FILE` reads the list from a file.
+The catalogue is the registry, `src/core/tests.json`: its order is the run
+order, and both programs, the menu and the tools are built from it
+(`tools/registry.py`). Related tests form a suite (Model gallery, Fill rate,
+Triangle rate, Texture memory, State changes, Quake level); each keeps its own
+ID and result line, marked `parent=<suite>`. `BENCHG --list` or
+`BENCHGL --list` prints the registry. `--tests` takes IDs, three-character
+prefixes (`S2M`), suites (`FILL`), groups (`basic`, `scene`, `model`, `synth`,
+`level`), presets (`full`: scenes, models and feature tests; `scenes`;
+`features`) or `all`, comma-separated; `--tests-from FILE` reads the list from
+a file.
 
 ## Basic
 
