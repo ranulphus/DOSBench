@@ -16,7 +16,10 @@ typedef struct {
     int shot_w, shot_h;         /* that mode: 640x480 if run, else the first */
     int vsync;
     int submit;                 /* RB_SUBMIT_* for static geometry */
-    double secs;                /* target seconds per test */
+    double secs;                /* --secs: seconds per timed test (0: the registry's) */
+    double captions;            /* --captions: seconds each card or caption is held (0: none) */
+    int aborted;                /* Esc on a card: stop after the current test */
+    const char *tests;          /* the --tests list */
     int warm, min_frames, max_frames;
     const char *data;           /* scene files */
     const char *out;
@@ -62,6 +65,7 @@ typedef struct test_def {
     const char *metric;         /* the T-line key it is judged by */
     const char *unit;
     int weight;                 /* > 0: in the score */
+    double secs;                /* timed tests: seconds unless --secs (0: 5) */
     const char *headline;       /* suites: the phase shown for the suite */
     const test_impl *impl;      /* NULL for a suite */
 } test_def;
@@ -69,10 +73,13 @@ typedef struct test_def {
 enum { T_GL_ONLY = 1, T_DATA = 2, T_SUITE = 4 };
 
 typedef struct { const char *id, *title, *tests; } db_preset;
+typedef struct { const char *id, *title; } db_group;
 
 /* registry.c: every row, ending with a zero id; the presets likewise. */
 extern const test_def db_tests[];
 extern const db_preset db_presets[];
+extern const db_group db_groups[];
+const char *db_group_title(const char *group);
 
 /* select.c: whether a test runs for a --tests list: all, a preset, a group,
  * a suite (its phases), an id, or an id prefix of up to 3 characters. */

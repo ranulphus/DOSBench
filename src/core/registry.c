@@ -9,11 +9,17 @@
 
 const test_def db_tests[] = {
 #define DB_SUITE(id, group, title, what, headline) \
-    { id, group, "", title, what, T_SUITE, 0, NULL, "", "", 0, headline, NULL },
-#define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, derive, title, what) \
-    { id, group, parent, title, what, flags, param, file, metric, unit, weight, "", &impl_##impl },
+    { id, group, "", title, what, T_SUITE, 0, NULL, "", "", 0, 0, headline, NULL },
+#define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, secs, derive, title, what) \
+    { id, group, parent, title, what, flags, param, file, metric, unit, weight, secs, "", &impl_##impl },
 #include "registry.h"
-    { NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, 0, NULL, NULL }
+    { NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, 0, 0, NULL, NULL }
+};
+
+const db_group db_groups[] = {
+#define DB_GROUP(id, title) { id, title },
+#include "registry.h"
+    { NULL, NULL }
 };
 
 const db_preset db_presets[] = {

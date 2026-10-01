@@ -72,3 +72,12 @@ int reg_count(const char *list)
         n += reg_selected(d, list);
     return n;
 }
+
+const char *db_group_title(const char *group)
+{
+    const db_group *g;
+    for (g = db_groups; g->id; g++)
+        if (!strcmp(g->id, group))
+            return g->title;
+    return group;
+}

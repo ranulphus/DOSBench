@@ -33,7 +33,8 @@ BENCHG  [options] --glide=PATH      Glide via an OVL (DOS/4GW; needs DOS4GW.EXE)
                       MGAGLIDE zoom=1, zoomed) into a larger BIOS mode; the H line records
                       display=WxH fit=native|zoom|integer|fill|aspect. Glide has no 640x512:
                       run it with SET MGAGLIDE=res=640x512 and --modes 640x480
-  --secs S            target seconds per timed test (default 5)
+  --secs S            seconds per timed test (default: 3 per feature phase, 5 per model)
+  --captions S        hold each title card or caption S seconds (default 1; 0: none)
   --submit arrays|lists|immediate   OpenGL static geometry path (default arrays)
   --vsync             sync swaps to the retrace
   --shots             save one frame per test as <out>\<tag><ID>.PPM, in one mode:

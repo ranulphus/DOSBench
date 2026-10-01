@@ -11,9 +11,11 @@
  *          [--args FILE (more arguments from a file)]
  *          [--submit arrays|lists|immediate] [--secs S] [--data DIR]
  *          [--tag C] [--shot-frames F,...] [--list] [--glide=PATH] [--out DIR]
- *          [--noexit]
+ *          [--captions S] [--noexit]
  */
 #include "bench.h"
+#include "present.h"
+#include "ov.h"
 #include "stats.h"
 #include "timer.h"
 #include "hx.h"
@@ -172,10 +174,13 @@ static void result(const tctx *t, const char *status, int n, double total_ms, co
              t->note[0] ? " " : "", t->note);
 }
 
-static void run_test(const test_def *d)
+/* Run one test (a phase gets its caption first: phase i of ni, test k of
+ * n); what it measured goes to *out for the cards. */
+static void run_test(const test_def *d, int i, int ni, int k, int kn, const db_result *before, db_result *out)
 {
     tctx t;
     int rc, f, n = 0, cap = db.max_frames;
+    double secs = db.secs > 0 ? db.secs : d->secs > 0 ? d->secs : 5.0;
     double *ft, *sub, submit = 0, total;
     tmr_t t0, prev, a, b, c;
     unsigned long tex0;
@@ -183,6 +188,9 @@ static void run_test(const test_def *d)
     st_summary s;
     memset(&t, 0, sizeof t);
     t.def = d;
+    memset(out, 0, sizeof *out);
+    out->d = d;
+    strcpy(out->status, "skip");
     if ((d->flags & T_GL_ONLY) && is_glide()) {
         strcpy(t.note, "why=gl-only");
         hx_log("HX-TEST %s SKIP gl-only", d->id);
@@ -195,8 +203,12 @@ static void run_test(const test_def *d)
         if (rc < 0)
             hx_test(d->id, 0, "setup failed %s", t.note);
         result(&t, rc > 0 ? "skip" : "fail", 0, 0, NULL, 0, 0, 0);
+        if (rc < 0)
+            strcpy(out->status, "fail");
         return;
     }
+    if (d->parent[0] && pr_caption(d, &t, i, ni, k, kn, before))
+        db.aborted = 1;                 /* Esc: this test still runs */
     if (t.frames > 0)                   /* a camera path: fixed frames (a few in --quick) */
         cap = db.quick && t.frames > db.max_frames ? db.max_frames : t.frames;
     ft = (double *)malloc((size_t)cap * sizeof *ft);
@@ -227,7 +239,7 @@ static void run_test(const test_def *d)
         prev = c;
         n++;
         if (t.frames > 0 ? n >= cap
-                         : n >= cap || (n >= db.min_frames && tmr_ms(c - t0) >= db.secs * 1000.0))
+                         : n >= cap || (n >= db.min_frames && tmr_ms(c - t0) >= secs * 1000.0))
             break;
     }
     rb_finish();
@@ -272,6 +284,15 @@ static void run_test(const test_def *d)
     }
     result(&t, "ok", n, total, &s, n ? submit / n : 0, rb_tex_bytes() - tex0, crc);
     hx_test(d->id, 1, "frames=%d fps=%.2f", n, s.fps);
+    strcpy(out->status, "ok");
+    out->fps = s.fps;
+    out->p99_ms = s.p99_ms;
+    {
+        double sec = total / 1000.0;
+        out->value = !strcmp(d->metric, "mpix_s") ? t.pixels * n / sec / 1e6 :
+                     !strcmp(d->metric, "ktris_s") ? t.tris * n / sec / 1000.0 :
+                     !strcmp(d->metric, "mtexel_s") ? t.texels * n / sec / 1e6 : s.fps;
+    }
     free(ft);
     free(sub);
     if (d->impl->done)
@@ -308,9 +329,53 @@ static int run_mode(int w, int h, int optional)
              submit_name(db.submit), tmr_source(), tmr_hz() / 1e6, in->tex_mem / 1024, db.quick, disp,
              in->fit[0] ? in->fit : "?");
     rb_set_submit(db.submit);
-    for (d = db_tests; d->id; d++)              /* registry order */
-        if (reg_selected(d, tests_arg))
-            run_test(d);
+    if (db.captions > 0 && ov_open() < 0)
+        db.captions = 0;                        /* no font texture: no cards */
+    {
+        int k = 0, kn = reg_count(tests_arg), nres = 0;
+        const test_def *suite = NULL;
+        db_result last, res[32];
+        memset(&last, 0, sizeof last);
+        for (d = db_tests; d->id && !db.aborted; d++) {     /* registry order */
+            if (d->flags & T_SUITE) {
+                if (reg_suite_used(d, tests_arg)) {
+                    suite = d;
+                    nres = 0;
+                    if (pr_title(d, k + 1, kn, &last))
+                        db.aborted = 1;
+                }
+                continue;
+            }
+            if (!reg_selected(d, tests_arg))
+                continue;
+            k++;
+            if (!d->parent[0] && pr_title(d, k, kn, &last))
+                db.aborted = 1;
+            {
+                int i = 0, ni = 0;              /* its place among the suite's selected phases */
+                const test_def *p;
+                if (d->parent[0])
+                    for (p = db_tests; p->id; p++)
+                        if (!strcmp(p->parent, d->parent) && reg_selected(p, tests_arg)) {
+                            ni++;
+                            if (p == d)
+                                i = ni;
+                        }
+                {
+                    db_result prev = last;      /* run_test clears what it writes */
+                    run_test(d, i, ni, k, kn, &prev, &last);
+                }
+                if (suite && d->parent[0] && !strcmp(d->parent, suite->id)) {
+                    if (nres < (int)(sizeof res / sizeof res[0]))
+                        res[nres++] = last;
+                    if (i == ni && pr_summary(suite, res, nres, k, kn))
+                        db.aborted = 1;
+                }
+            }
+        }
+    }
+    if (db.captions > 0)
+        ov_close();
     rb_close();
     return 0;
 }
@@ -359,7 +424,8 @@ int main(int argc, char **argv)
     int hxc = 0, i, bad = 0;
     char err[128] = "";
     argc = expand_args(argc, argv, &argv);
-    db.secs = 5.0;
+    db.secs = 0;                        /* the registry's: 3 s per feature phase, 5 s per model */
+    db.captions = 1.0;
     db.warm = 3;
     db.min_frames = 20;
     db.max_frames = 2000;
@@ -373,6 +439,7 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--tests-from") && v) { tests_from = v; i++; }
         else if (!strcmp(a, "--modes") && v) { modes_arg = v; i++; }
         else if (!strcmp(a, "--secs") && v) { db.secs = atof(v); i++; }
+        else if (!strcmp(a, "--captions") && v) { db.captions = atof(v); i++; }
         else if (!strcmp(a, "--data") && v) { db.data = v; i++; }
         else if (!strcmp(a, "--tag") && v) { db.tag = v[0]; i++; }
         else if (!strcmp(a, "--shot-frames") && v) { shot_frames = v; i++; }
@@ -396,6 +463,7 @@ int main(int argc, char **argv)
     }
     db.out = hx_args.out;
     load_tests_arg();
+    db.tests = tests_arg;
     if (db.quick) {
         db.warm = 1;
         db.min_frames = db.max_frames = 3;
@@ -412,6 +480,7 @@ int main(int argc, char **argv)
     }
     snprintf(run_id, sizeof run_id, "%08lx", (unsigned long)(tmr_now() & 0xFFFFFFFFu));
     hx_stat("timer source=%s hz=%.0f", tmr_source(), tmr_hz());
+    ov_load_font();                     /* the video BIOS's font, before any mode is set */
     if (rb_load(hx_args.glide, err, sizeof err) < 0) {
         hx_test("load", 0, "%s", err);
         hx_done(HX_INIT_FAILED);
@@ -438,7 +507,7 @@ int main(int argc, char **argv)
         for (i = 0; i < nm; i++)
             if (mw[i] == 640 && mh[i] == 480)
                 db.shot_w = 640, db.shot_h = 480;
-        for (i = 0; i < nm; i++)
+        for (i = 0; i < nm && !db.aborted; i++)
             run_mode(mw[i], mh[i], all);
     }
     res_close();

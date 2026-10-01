@@ -36,9 +36,18 @@ used, at 55 ms resolution; DJGPP falls back to `uclock()`.
 - Vsync off (`--vsync` to turn it on); the swap interval is 0 in Glide.
 - Warm-up frames first (3; 1 in `--quick`), not measured; the hardware is
   idled before timing starts.
-- Timed tests draw frames until at least 20 frames and `--secs` seconds (5
-  by default) have passed, at most 2000 frames. Camera paths (the level)
-  always draw the same frames: every frame of the path.
+- Timed tests draw frames until at least 20 frames and their time have
+  passed, at most 2000 frames: 3 s per feature-test phase and 5 s per model
+  (the registry's `secs`), or `--secs` seconds for all of them. Rates are per
+  second, so the time changes their noise, not their value. Camera paths
+  (the level, the game scenes) always draw the same frames: every frame of
+  the path.
+- Between measurements the screen shows a title card before each suite and
+  each test that is not a phase, a caption over a phase's first frame, and a
+  summary after each suite (`--captions S`: held S seconds, cards twice as
+  long; 0 for none). They are drawn before the warm-up and never in a timed
+  frame or a saved shot, so they change no result. The text is the video
+  BIOS's own 8x16 font, read at start-up.
 - Every frame is timed from one swap's return to the next: frame time.
   The time from starting the frame to calling swap is the submit time.
 - After measuring, the hardware is idled and the total time taken, so
@@ -79,7 +88,8 @@ space-separated `key=value`:
   `impl` (runtime or library version), `card`, `mode`, `vsync`, `submit`,
   `timer`, `cpu_mhz`, `tex_kb`, `quick`.
 - `T` lines, one per test: `run`, `prog`, `tag`, `api`, `mode`, `test`,
-  `group`, `status` (ok, skip, fail), `frames`, `secs`, `fps`, `avg_ms`,
+  `group`, `parent` (the suite, for its phases), `status` (ok, skip, fail),
+  `frames`, `secs`, `fps`, `avg_ms`,
   `med_ms`, `p99_ms`, `min_ms`, `max_ms`, `submit_ms`, `tris_frame`, the
   rates (`ktris_s`, `mpix_s`, `mtexel_s`), `tex_kb_frame`, `crc` of the
   saved frame, and test notes (`changes=`, `copies=`, `why=`...).

@@ -1,13 +1,13 @@
 {
- "_about": "DOSBench's test registry: the one list both programs, the menu, tools/report.py and tools/run.py are built from (tools/registry.py generates build/gen/registry.h). File order is run order. A suite is a heading over the tests that name it as parent (its phases); a phase keeps its own test id and T line. impl names the code that draws it (a test_impl in src/core); param and file go to that code unchanged. metric is the T-line key a test is judged by, unit how it is shown; weight > 0 puts a test in the score.",
+ "_about": "DOSBench's test registry: the one list both programs, the menu, tools/report.py and tools/run.py are built from (tools/registry.py generates build/gen/registry.h). File order is run order. A suite is a heading over the tests that name it as parent (its phases); a phase keeps its own test id and T line. impl names the code that draws it (a test_impl in src/core); param and file go to that code unchanged. metric is the T-line key a test is judged by, unit how it is shown; weight > 0 puts a test in the score; secs (a group's or a test's) is how long a timed test runs unless --secs says otherwise (default 5).",
  "version": 2,
  "score": {"title": "DOSBench score", "scale": 100, "mean": "geometric", "metric": "fps", "scorever": 1,
            "_why": "100 x the geometric mean of the scored tests' average frame rates: no reference machine, and one slow scene cannot dominate it"},
  "groups": [
   {"id": "basic", "title": "Basic check"},
   {"id": "scene", "title": "Game scenes"},
-  {"id": "model", "title": "Models"},
-  {"id": "synth", "title": "Feature tests"},
+  {"id": "model", "title": "Models", "secs": 5},
+  {"id": "synth", "title": "Feature tests", "secs": 3},
   {"id": "level", "title": "Quake level"}
  ],
  "presets": [

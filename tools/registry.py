@@ -27,9 +27,11 @@ def load():
     if _reg is None:
         reg = json.load(open(REGISTRY))
         by = {}
+        gsecs = {g["id"]: g.get("secs", 0) for g in reg["groups"]}
         for t in reg["tests"]:
             if t.get("parent"):
                 t["group"] = by[t["parent"]]["group"]
+            t.setdefault("secs", gsecs.get(t["group"], 0))
             t.setdefault("parent", "")
             t.setdefault("suite", False)
             t.setdefault("metric", "fps")
@@ -175,7 +177,7 @@ def gen(out):
              "#ifndef DB_PRESET", "#define DB_PRESET(id, title, tests)", "#endif",
              "#ifndef DB_SUITE", "#define DB_SUITE(id, group, title, what, headline)", "#endif",
              "#ifndef DB_TEST",
-             "#define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, derive, title, what)",
+             "#define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, secs, derive, title, what)",
              "#endif"]
     used = []
     for t in reg["tests"]:
@@ -190,10 +192,10 @@ def gen(out):
                                                           c_str(t["what"]), c_str(t["headline"])))
         else:
             flags = (1 if t["gl_only"] else 0) | (2 if t["file"] else 0)
-            lines.append("DB_TEST(%s, %s, %s, %s, %d, %s, %d, %s, %s, %d, %s, %s, %s)" % (
+            lines.append("DB_TEST(%s, %s, %s, %s, %d, %s, %d, %s, %s, %d, %.1f, %s, %s, %s)" % (
                 c_str(t["id"]), c_str(t["group"]), c_str(t["parent"]), t["impl"], t["param"],
                 c_str(t["file"]) if t["file"] else "NULL", flags, c_str(t["metric"]), c_str(t["unit"]),
-                t["weight"], c_str(t["derive"]), c_str(t["title"]), c_str(t["what"])))
+                t["weight"], t["secs"], c_str(t["derive"]), c_str(t["title"]), c_str(t["what"])))
     sc = reg["score"]
     lines += ["#undef DB_IMPL", "#undef DB_GROUP", "#undef DB_PRESET", "#undef DB_SUITE", "#undef DB_TEST",
               "#ifndef DB_SCORE_SCALE", "#define DB_SCORE_SCALE %.1f" % sc["scale"],

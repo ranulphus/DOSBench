@@ -16,7 +16,7 @@
 typedef struct { const char *id, *group, *what; int gl_only; const char *metric, *unit; } menu_test;
 /* The test catalogue: the registry (src/core/tests.json), in run order. */
 static const menu_test menu_tests[] = {
-#define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, derive, title, what) \
+#define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, secs, derive, title, what) \
     { id, group, what, (flags) & 1, metric, unit },
 #include "registry.h"
     { 0, 0, 0, 0, 0, 0 }
@@ -29,11 +29,11 @@ static const menu_test menu_tests[] = {
 #define NMODES 10
 enum { O_GL, O_GLIDE, O_M0, O_VSYNC = O_M0 + NMODES, O_SUBMIT, O_SECS, O_SHOTS, O_COUNT };
 static const char *const submit_names[] = { "arrays", "lists", "immediate" };
-static const int secs_values[] = { 3, 5, 10, 20 };
+static const int secs_values[] = { 0, 3, 5, 10, 20 };   /* 0: the registry's (3 s per feature phase, 5 s per model) */
 static const char *const mode_names[NMODES] = { "320x200", "320x240", "400x300", "512x384", "640x480",
                                                 "640x512", "800x600", "1024x768", "1280x1024", "1600x1200" };
 
-static int opt[O_COUNT] = { 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0 };   /* GL, Glide, 640x480, 5 s */
+static int opt[O_COUNT] = { 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };   /* GL, Glide, 640x480, auto */
 static int sel[MAX_TESTS];
 static int ntests;
 
@@ -123,7 +123,12 @@ static void row_text(int r, char *buf, size_t n)
             break;
         case O_VSYNC: snprintf(buf, n, "     Vsync: %s", opt[r] ? "on" : "off (measure the hardware)"); break;
         case O_SUBMIT: snprintf(buf, n, "     OpenGL static geometry: %s", submit_names[opt[r]]); break;
-        case O_SECS: snprintf(buf, n, "     Seconds per timed test: %d", secs_values[opt[r]]); break;
+        case O_SECS:
+            if (secs_values[opt[r]])
+                snprintf(buf, n, "     Seconds per timed test: %d", secs_values[opt[r]]);
+            else
+                snprintf(buf, n, "     Seconds per timed test: auto (3 per feature phase, 5 per model)");
+            break;
         default: snprintf(buf, n, "     Save a frame per test: %s", opt[r] ? "yes (OUT\\*.PPM)" : "no"); break;
         }
     } else if (r == O_COUNT) {
@@ -162,7 +167,7 @@ static void toggle(int r)
         if (r == O_SUBMIT)
             opt[r] = (opt[r] + 1) % 3;
         else if (r == O_SECS)
-            opt[r] = (opt[r] + 1) % 4;
+            opt[r] = (opt[r] + 1) % (int)(sizeof secs_values / sizeof secs_values[0]);
         else
             opt[r] = !opt[r];
     } else if (r > O_COUNT) {
