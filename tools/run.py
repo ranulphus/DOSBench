@@ -331,7 +331,7 @@ def games_job(card, key, tests, a):
     # DOS-GL: stage DOS-GL's game builds and games list here.
     hl = key == "halflife"
     tool = "halflife" if hl else "quake"
-    q = rsp_dir = os.path.join(ROOT, "build", "games", tool)
+    q = rsp_dir = os.path.join(ROOT, "build", "games", tool, card)   # per card: jobs may run side by side
     os.makedirs(q, exist_ok=True)
     for f in (("HLDGL.EXE", "EXTRAS.PK3", "DOSLFN.COM") if hl else
               ("QDOSDGL.EXE", "Q2DGL.EXE", "GAMEX86.DXE", "DOSLFN.COM")):

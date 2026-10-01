@@ -106,4 +106,6 @@ draws the same frames. The catalogue is `tools/games.json`.
 | Q2D1P | the same with 8-bit paletted textures | Q2D1, looser: Quake 2 re-quantises its textures to the palette |
 | HLD1 | Half-Life (WON) `hlbench1`: the c0a0 tram ride, world geometry (recorded by DOS-GL's `tools/halflife/run.sh record`); 128 MB PC, no sound | the first card |
 | HLD2 | Half-Life (WON) `hlbench2`: c1a2, the map with the most monsters, MP5 fire | the first card |
+| HLD1V | HLD1 on Xash3D's VBO path (`gl_vbo 1`): world lightmaps in the second texture unit, one pass (G400/G450: DOS-GL's buffer objects and combine) | HLD1 |
+| HLD2V | HLD2 on the VBO path | HLD2 |
 
