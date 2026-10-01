@@ -1,5 +1,5 @@
 {
- "_about": "Game tests (group game): each is a timedemo of a DOS-GL build of a Quake port or Half-Life (DOS-GL's tools/quake and tools/halflife build them) writing DOSBench H/T lines itself (-dosbench / td_dbtest) and its frame as L<ID>.PPM. game: the key in DOS-GL's tools/quake/games.json or tools/halflife/games.json (the D: disk); needs: a GL feature DOS-GL must advertise first (mtex: GL_ARB_multitexture, plan Q5); ref: the test whose frame this one is checked against (game-pal-vs-rgba, game-mtex-vs-2pass). Retail data stays in the local fixtures.",
+ "_about": "Game tests (group game): each is a timedemo of a DOS-GL build of a Quake port, Half-Life or PrBoom-plus (DOS-GL's tools/quake, tools/halflife and tools/doom build them) writing DOSBench H/T lines itself (-dosbench / td_dbtest) and its frame as L<ID>.PPM. game: the key in DOS-GL's tools/quake/games.json, tools/halflife/games.json or tools/doom/games.json (the D: disk); needs: a GL feature DOS-GL must advertise first (mtex: GL_ARB_multitexture, plan Q5); ref: the test whose frame this one is checked against (game-pal-vs-rgba, game-mtex-vs-2pass). Retail data stays in the local fixtures.",
  "Q1D1":  {"game": "quake", "what": "GLQuake timedemo demo1 (retail)",
            "exe": "QDOSDGL.EXE", "args": "-nosound -nocdaudio -nolan -width 640 -height 480 -fixedtime -tdquit -dosbench C:/OUT Q1D1 +timedemo demo1"},
  "Q1D1M": {"game": "quake", "what": "GLQuake demo1, multitexture lightmaps", "needs": "mtex", "ref": "Q1D1",
@@ -25,5 +25,13 @@
  "FW1":   {"game": "fifthwheel", "what": "Fifth Wheel: 3,000 frames of the autopilot touring its generated world, one tick per frame, vsync off (the game writes its own H/T lines, dgk/bench.h)",
            "exe": "FWHEEL.EXE", "args": "-nosound -novsync -fixed -autopilot -frames 3000 -dbtest FW1"},
  "FWP":   {"game": "fifthwheel", "what": "Fifth Wheel's performance probe: T lines FWP-<tris>-<path>[-tex] and FWP-<tris>-d<draws> (triangles, draw calls, texturing, submission paths)",
-           "exe": "FWHEEL.EXE", "args": "-nosound -novsync -probe"}
+           "exe": "FWHEEL.EXE", "args": "-nosound -novsync -probe"},
+ "PBD1":  {"game": "doom", "what": "PrBoom-plus timedemo: Doom II demo1 (MAP11) on the OpenGL renderer through DOS-GL (the fork's GL compatibility path, screen sky)",
+           "exe": "PRBOOMP.EXE", "args": "-iwad DOOM2.WAD -vidmode gl -width 640 -height 480 -nosound -timedemo demo1 -dosbench C:/OUT PBD1 -dbshot 200"},
+ "PBD1S": {"game": "doom", "what": "PrBoom-plus timedemo: Doom II demo1 on the software renderer (8-bit VESA mode: the CPU's work, no GL)",
+           "exe": "PRBOOMP.EXE", "args": "-iwad DOOM2.WAD -vidmode 8 -width 640 -height 480 -nosound -timedemo demo1 -dosbench C:/OUT PBD1S -dbshot 200"},
+ "PBD2":  {"game": "doom", "what": "PrBoom-plus timedemo: The Ultimate Doom demo4 (E4M2) on the OpenGL renderer",
+           "exe": "PRBOOMP.EXE", "args": "-iwad DOOM.WAD -vidmode gl -width 640 -height 480 -nosound -timedemo demo4 -dosbench C:/OUT PBD2 -dbshot 200"},
+ "PBD2S": {"game": "doom", "what": "PrBoom-plus timedemo: The Ultimate Doom demo4 on the software renderer",
+           "exe": "PRBOOMP.EXE", "args": "-iwad DOOM.WAD -vidmode 8 -width 640 -height 480 -nosound -timedemo demo4 -dosbench C:/OUT PBD2S -dbshot 200"}
 }

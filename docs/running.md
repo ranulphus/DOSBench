@@ -120,12 +120,16 @@ Half-Life builds (`make quake`, `make halflife` in DOS-GL) and the game
 fixtures (DOS-GL's `tools/quake/fixtures.py`, `tools/quake/q2record.sh
 q2bench1` for the Quake 2 demo, `tools/halflife/fixtures.py` and
 `DEMO=hlbench1 MAP=c0a0` / `DEMO=hlbench2 MAP=c1a2 tools/halflife/run.sh
-record` for the Half-Life demos). Half-Life runs on a 128 MB PC.
+record` for the Half-Life demos). Half-Life runs on a 128 MB PC. The
+PrBoom-plus tests (`PBD*`) need DOS-GL's `tools/doom/build.sh` and the
+owner's IWADs (`tools/doom/fixtures.py`); the IWADs' own demos play, so
+nothing is recorded.
 
 ```
 python3 tools/run.py games --card g450                  # every game test
 python3 tools/run.py games --card g450,g400,g200 --tests Q1D1,Q2D1
 python3 tools/run.py games --card g450,g400,g200 --tests HLD1,HLD2
+python3 tools/run.py games --card g450,g400,g200 --tests PBD1,PBD1S,PBD2,PBD2S
 ```
 
 The game jobs' `RESULTS.TXT` go into the report with `tools/report.py ingest

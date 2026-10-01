@@ -422,6 +422,45 @@ def fw_job(card, tests, a):
     return out
 
 
+def doom_job(card, tests, a):
+    """PrBoom-plus's tests (DOS-GL's tools/doom: the local fork built on SDL3
+    and DOS-GL): the owner's IWADs on D: (DOS-GL's tools/doom/games.json),
+    PRBOOMP.EXE and PRBOOM.WAD beside them. Each test runs from a response
+    file; the game writes its own HX-START/HX-DONE (DOOM_SERIAL), its H and T
+    lines (-dosbench) and its frame as L<ID>.PPM, with 8.3 names (LFN=n)."""
+    dosgl = VARS["DOSGL"]
+    q = rsp_dir = os.path.join(ROOT, "build", "games", "doom", card)   # per card: jobs may run side by side
+    os.makedirs(q, exist_ok=True)
+    for f in ("PRBOOMP.EXE", "PRBOOM.WAD"):
+        src = os.path.join(dosgl, "build", "doom", f)
+        if not os.path.exists(src):
+            raise SystemExit("run.py: no %s (DOS-GL: tools/doom/build.sh)" % src)
+        shutil.copyfile(src, os.path.join(q, f))
+    gfile = os.path.join(q, "games.json")
+    shutil.copyfile(os.path.join(dosgl, "tools", "doom", "games.json"), gfile)
+    game = json.load(open(gfile))["doom"]
+    out = os.path.join(ROOT, "out", "games", card, "doom")
+    files = ["%s=D:/%s/%s" % (os.path.join(q, f), game["dir"], f) for f in ("PRBOOMP.EXE", "PRBOOM.WAD")]
+    cmds = ["D:", "CD \\" + game["cwd"]]
+    for tid, t in tests.items():
+        rsp = os.path.join(rsp_dir, tid + ".RSP")
+        with open(rsp, "w", newline="\r\n") as f:
+            f.write(t["args"] + "\n")
+        files.append("%s=/TEST/%s.RSP" % (rsp, tid))
+        cmds.append("%s @C:\\TEST\\%s.RSP" % (t["exe"], tid))
+    cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "loopa", "run.py"),
+           "--name", "dosbench-doom-%s" % card, "--card", card, "--out", out,
+           "--games-file", gfile, "--game", "doom", "--pre", "SET DOOM_SERIAL=1", "--pre", "SET LFN=n",
+           "--timeout", str(a.timeout), "--idle", str(a.idle)]
+    for f in files:
+        cmd += ["--file", f]
+    for c in cmds:
+        cmd += ["--cmd", c]
+    print("games %s doom: %s" % (card, " ".join(tests)))
+    subprocess.run(cmd, cwd=ROOT)
+    return out
+
+
 def game_results(out):
     """T records of a game job's RESULTS.TXT, by test ID."""
     path = os.path.join(out, "files", "RESULTS.TXT")
@@ -447,7 +486,8 @@ def cmd_games(a):
             print("  %-5s %-6s skip why=no-%s" % (card, k, cat[k]["needs"]))
         for key in sorted(set(t["game"] for t in runnable.values())):
             tests = {k: v for k, v in runnable.items() if v["game"] == key}
-            out = fw_job(card, tests, a) if key == "fifthwheel" else games_job(card, key, tests, a)
+            out = (fw_job(card, tests, a) if key == "fifthwheel" else doom_job(card, tests, a) if key == "doom"
+                   else games_job(card, key, tests, a))
             dirs.setdefault(key, []).append(out)
             recs = game_results(out)
             for tid in tests:

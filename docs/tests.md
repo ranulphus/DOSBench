@@ -110,4 +110,8 @@ draws the same frames. The catalogue is `tools/games.json`.
 | HLD2V | HLD2 on the VBO path | HLD2 |
 | FW1 | Fifth Wheel (`FIFTHWHEEL`: its game and the dgk kit on DOS-GL): 3,000 frames of the autopilot touring its generated 4 x 4 km world, one tick per frame, vsync off; no retail data, the files go on C: | the first card |
 | FWP | Fifth Wheel's performance probe: one record per case, `FWP-<tris>-arr`/`-list`/`-imm` (1,000-8,000 triangles through vertex arrays, display lists, immediate mode), `-arr-tex` (textured), `FWP-2000-d<draws>` (50-400 draw calls), and an `FWP` summary; the game writes them itself (`dgk/bench.h`) | none: the records feed Fifth Wheel's budget model (its `docs/perf.md`) |
+| PBD1 | PrBoom-plus (DOS-GL's `tools/doom`: the fork on SDL3 and DOS-GL) Doom II `demo1` (MAP11) on the OpenGL renderer: compatibility mode, the sky as a screen quad; the owner's IWADs, 640x480, no sound; the game writes its own H/T lines (`-dosbench`) | the first card |
+| PBD1S | the same demo on the software renderer (8-bit VESA mode: the CPU's work, GL idle) | the first card |
+| PBD2 | PrBoom-plus The Ultimate Doom `demo4` (E4M2) on the OpenGL renderer | the first card |
+| PBD2S | the same demo on the software renderer | the first card |
 
