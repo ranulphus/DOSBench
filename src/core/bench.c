@@ -11,10 +11,12 @@
  *          [--args FILE (more arguments from a file)]
  *          [--submit arrays|lists|immediate] [--secs S] [--data DIR]
  *          [--tag C] [--shot-frames F,...] [--list] [--glide=PATH] [--out DIR]
- *          [--captions S] [--noexit]
+ *          [--captions S] [--session ID] [--noexit]
  */
 #include "bench.h"
 #include "present.h"
+#include "score.h"
+#include "registry.h"                   /* DB_SCORE_SCALE, DB_SCORE_VER */
 #include "ov.h"
 #include "stats.h"
 #include "timer.h"
@@ -33,6 +35,7 @@ db_opts db;
 static const char *tests_arg = "all";
 static const char *shot_frames;         /* --shot-frames a,b,...: extra saved frames */
 static const char *modes_arg = "640x480";
+static const char *session = "-";      /* --session: the menu's id for one run of both programs */
 static int list_only;
 static char run_id[12];
 
@@ -324,10 +327,10 @@ static int run_mode(int w, int h, int optional)
     else
         strcpy(disp, "?");
     res_line("H run=%s prog=%s ver=%s build=%s tag=%c api=%s impl=%s card=%s mode=%dx%d vsync=%d submit=%s "
-             "timer=%s cpu_mhz=%.1f tex_kb=%lu quick=%d display=%s fit=%s",
+             "timer=%s cpu_mhz=%.1f tex_kb=%lu quick=%d display=%s fit=%s session=%s",
              run_id, DB_PROG, DB_VERSION, DB_BUILD_ID, db.tag, in->api, impl, card, w, h, db.vsync,
              submit_name(db.submit), tmr_source(), tmr_hz() / 1e6, in->tex_mem / 1024, db.quick, disp,
-             in->fit[0] ? in->fit : "?");
+             in->fit[0] ? in->fit : "?", session);
     rb_set_submit(db.submit);
     if (db.captions > 0 && ov_open() < 0)
         db.captions = 0;                        /* no font texture: no cards */
@@ -335,7 +338,11 @@ static int run_mode(int w, int h, int optional)
         int k = 0, kn = reg_count(tests_arg), nres = 0;
         const test_def *suite = NULL;
         db_result last, res[32];
+        score_acc acc;
+        char sline[400];
+        double score;
         memset(&last, 0, sizeof last);
+        score_reset(&acc, db_tests, tests_arg);
         for (d = db_tests; d->id && !db.aborted; d++) {     /* registry order */
             if (d->flags & T_SUITE) {
                 if (reg_suite_used(d, tests_arg)) {
@@ -364,6 +371,7 @@ static int run_mode(int w, int h, int optional)
                 {
                     db_result prev = last;      /* run_test clears what it writes */
                     run_test(d, i, ni, k, kn, &prev, &last);
+                    score_got(&acc, d, last.status, last.fps);
                 }
                 if (suite && d->parent[0] && !strcmp(d->parent, suite->id)) {
                     if (nres < (int)(sizeof res / sizeof res[0]))
@@ -373,6 +381,13 @@ static int run_mode(int w, int h, int optional)
                 }
             }
         }
+        /* The score, when a scored test was selected (the S line, methodology.md). */
+        if (score_line(&acc, db.quick, db.aborted, DB_SCORE_SCALE, DB_SCORE_VER, sline, sizeof sline, &score)) {
+            res_line("S run=%s prog=%s tag=%c api=%s mode=%dx%d %s", run_id, DB_PROG, db.tag,
+                     rb_get_info()->api, w, h, sline);
+            hx_log("HX-STAT score %s", sline);
+        }
+        pr_end(&acc, score, k, kn);
     }
     if (db.captions > 0)
         ov_close();
@@ -440,6 +455,7 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--modes") && v) { modes_arg = v; i++; }
         else if (!strcmp(a, "--secs") && v) { db.secs = atof(v); i++; }
         else if (!strcmp(a, "--captions") && v) { db.captions = atof(v); i++; }
+        else if (!strcmp(a, "--session") && v) { session = v; i++; }
         else if (!strcmp(a, "--data") && v) { db.data = v; i++; }
         else if (!strcmp(a, "--tag") && v) { db.tag = v[0]; i++; }
         else if (!strcmp(a, "--shot-frames") && v) { shot_frames = v; i++; }

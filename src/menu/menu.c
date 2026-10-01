@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 typedef struct { const char *id, *group, *what; int gl_only; const char *metric, *unit; } menu_test;
 /* The test catalogue: the registry (src/core/tests.json), in run order. */
@@ -204,9 +205,9 @@ static int write_run(void)
     f = fopen("RUN.ARG", "w");
     if (!f)
         return -1;
-    fprintf(f, "--tests-from TESTS.LST --data DATA --out OUT --noexit --modes %s --secs %d --submit %s%s%s\n",
-            modes, secs_values[opt[O_SECS]], submit_names[opt[O_SUBMIT]], opt[O_VSYNC] ? " --vsync" : "",
-            opt[O_SHOTS] ? " --shots" : "");
+    fprintf(f, "--tests-from TESTS.LST --data DATA --out OUT --noexit --modes %s --secs %d --submit %s%s%s "
+            "--session %08lx\n", modes, secs_values[opt[O_SECS]], submit_names[opt[O_SUBMIT]],
+            opt[O_VSYNC] ? " --vsync" : "", opt[O_SHOTS] ? " --shots" : "", (unsigned long)time(NULL));
     fclose(f);
     f = fopen("RUNSEL.BAT", "w");
     if (!f)
@@ -216,20 +217,51 @@ static int write_run(void)
         fprintf(f, "BENCHGL.EXE --args RUN.ARG\r\n");
     if (opt[O_GLIDE])
         fprintf(f, "BENCHG.EXE --args RUN.ARG --glide=GLIDE2X.OVL\r\n");
+    fprintf(f, "DBMENU.EXE --results\r\n");          /* this run's results, then back to the menu */
     fclose(f);
     return 0;
 }
 
 /* ---- Results -------------------------------------------------------------- */
+/* OUT\RESULTS.TXT: H lines (a program run and mode: run id, tag, session),
+ * T lines (a test: run id, test, figures) and S lines (the score). The
+ * session screen after a run shows one session (the menu's --session); the
+ * V screen shows the latest of everything. */
 typedef struct {
-    char tag, test[8], mode[10];
+    char tag, test[8], mode[10], status[8];
     double fps, metric, p99;
-    const char *unit;
 } res_t;
+
+typedef struct {
+    char tag, mode[10], status[12], missing[64];
+    double score;
+} score_t;
 
 static res_t res[400];
 static int nres;
-static char tags[8];
+static score_t scores[24];
+static int nscores;
+static char tags[8], modes_seen[4][10];
+static int nmodes;
+
+/* The registry's suites, for headings. */
+typedef struct { const char *id, *group, *title; } menu_suite;
+static const menu_suite menu_suites[] = {
+#define DB_SUITE(id, group, title, what, headline) { id, group, title },
+#include "registry.h"
+    { 0, 0, 0 }
+};
+static const char *const menu_titles[][3] = {        /* id, parent, title */
+#define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, secs, derive, title, what) \
+    { id, parent, title },
+#include "registry.h"
+    { 0, 0, 0 }
+};
+static const char *const menu_groups[][2] = {
+#define DB_GROUP(id, title) { id, title },
+#include "registry.h"
+    { 0, 0 }
+};
 
 /* The T-line key a test is judged by, from the registry; NULL for frame rates. */
 static const char *metric_key(const char *test, const char **unit)
@@ -271,44 +303,106 @@ static void sfield(const char *line, const char *key, char *out, int n)
     out[i] = 0;
 }
 
-static void load_results(void)
+static void add_tag(char t)
+{
+    if (!strchr(tags, t) && strlen(tags) < 3) {
+        size_t n = strlen(tags);
+        tags[n] = t;
+        tags[n + 1] = 0;
+    }
+}
+
+static void add_mode(const char *m)
+{
+    int i;
+    for (i = 0; i < nmodes; i++)
+        if (!strcmp(modes_seen[i], m))
+            return;
+    if (nmodes < 4)
+        strcpy(modes_seen[nmodes++], m);
+}
+
+/* The latest session in the file (the last H line's). */
+static void last_session(char *out, int n)
 {
     FILE *f = fopen("OUT\\RESULTS.TXT", "r");
-    char buf[600], status[8], tag[4];
-    nres = 0;
+    char buf[600];
+    out[0] = 0;
+    if (!f)
+        return;
+    while (fgets(buf, sizeof buf, f))
+        if (!strncmp(buf, "H ", 2))
+            sfield(buf, "session", out, n);
+    fclose(f);
+}
+
+/* Read OUT\RESULTS.TXT: every record, or only session's (its H lines name
+ * the run ids that belong to it). Later records replace earlier ones. */
+static void load_results(const char *session)
+{
+    FILE *f = fopen("OUT\\RESULTS.TXT", "r");
+    static char runs[32][12];
+    int nruns = 0;
+    char buf[600], run[12], tag[4], s[16];
+    nres = nscores = nmodes = 0;
     tags[0] = 0;
     if (!f)
         return;
     while (fgets(buf, sizeof buf, f)) {
-        res_t r;
-        const char *key;
-        int i;
-        if (strncmp(buf, "T ", 2))
-            continue;
-        sfield(buf, "status", status, sizeof status);
-        if (strcmp(status, "ok"))
-            continue;
-        memset(&r, 0, sizeof r);
-        sfield(buf, "tag", tag, sizeof tag);
-        r.tag = tag[0];
-        sfield(buf, "test", r.test, sizeof r.test);
-        sfield(buf, "mode", r.mode, sizeof r.mode);
-        r.fps = field(buf, "fps");
-        r.p99 = field(buf, "p99_ms");
-        key = metric_key(r.test, &r.unit);
-        r.metric = key ? field(buf, key) : -1;
-        if (!strchr(tags, r.tag) && strlen(tags) < 3) {
-            size_t n = strlen(tags);
-            tags[n] = r.tag;
-            tags[n + 1] = 0;
+        int i, mine = !session;
+        sfield(buf, "run", run, sizeof run);
+        if (session && !strncmp(buf, "H ", 2)) {
+            sfield(buf, "session", s, sizeof s);
+            if (!strcmp(s, session) && nruns < 32)
+                strcpy(runs[nruns++], run);
         }
-        for (i = 0; i < nres; i++)          /* the latest run replaces older ones */
-            if (res[i].tag == r.tag && !strcmp(res[i].test, r.test) && !strcmp(res[i].mode, r.mode))
-                break;
-        if (i < nres)
-            res[i] = r;
-        else if (nres < (int)(sizeof res / sizeof res[0]))
-            res[nres++] = r;
+        for (i = 0; !mine && i < nruns; i++)
+            mine = !strcmp(runs[i], run);
+        if (!mine)
+            continue;
+        sfield(buf, "tag", tag, sizeof tag);
+        if (!strncmp(buf, "T ", 2)) {
+            res_t r;
+            memset(&r, 0, sizeof r);
+            r.tag = tag[0];
+            sfield(buf, "test", r.test, sizeof r.test);
+            sfield(buf, "mode", r.mode, sizeof r.mode);
+            sfield(buf, "status", r.status, sizeof r.status);
+            r.fps = field(buf, "fps");
+            r.p99 = field(buf, "p99_ms");
+            r.metric = -1;
+            {
+                const char *unit, *key = metric_key(r.test, &unit);
+                if (key)
+                    r.metric = field(buf, key);
+            }
+            add_tag(r.tag);
+            add_mode(r.mode);
+            for (i = 0; i < nres; i++)
+                if (res[i].tag == r.tag && !strcmp(res[i].test, r.test) && !strcmp(res[i].mode, r.mode))
+                    break;
+            if (i < nres)
+                res[i] = r;
+            else if (nres < (int)(sizeof res / sizeof res[0]))
+                res[nres++] = r;
+        } else if (!strncmp(buf, "S ", 2)) {
+            score_t c;
+            memset(&c, 0, sizeof c);
+            c.tag = tag[0];
+            sfield(buf, "mode", c.mode, sizeof c.mode);
+            sfield(buf, "status", c.status, sizeof c.status);
+            sfield(buf, "missing", c.missing, sizeof c.missing);
+            c.score = field(buf, "score");
+            add_tag(c.tag);
+            add_mode(c.mode);
+            for (i = 0; i < nscores; i++)
+                if (scores[i].tag == c.tag && !strcmp(scores[i].mode, c.mode))
+                    break;
+            if (i < nscores)
+                scores[i] = c;
+            else if (nscores < (int)(sizeof scores / sizeof scores[0]))
+                scores[nscores++] = c;
+        }
     }
     fclose(f);
 }
@@ -318,73 +412,219 @@ static const char *tag_name(char t)
     return t == 'L' ? "OpenGL" : t == 'G' ? "Glide" : t == 'V' ? "Glide (3dfx)" : "?";
 }
 
-static void show_results(void)
+/* label cut to w columns; "triangles" becomes "tris" when it does not fit. */
+static void fit(char *out, int w, const char *label)
 {
-    /* One row per (test, mode); a column per program. */
-    static char keys[400][20];
-    int nkeys = 0, i, k, top = 0, ch;
-    load_results();
-    for (i = 0; i < nres; i++) {
-        char key[20];
-        snprintf(key, sizeof key, "%s %s", res[i].test, res[i].mode);
-        for (k = 0; k < nkeys && strcmp(keys[k], key); k++)
-            ;
-        if (k == nkeys)
-            strcpy(keys[nkeys++], key);
+    char buf[64];
+    const char *p = strstr(label, "triangles");
+    if ((int)strlen(label) > w && p)
+        snprintf(buf, sizeof buf, "%.*stris%s", (int)(p - label), label, p + 9);
+    else
+        snprintf(buf, sizeof buf, "%s", label);
+    snprintf(out, (size_t)w + 1, "%s", buf);
+}
+
+/* A frame rate, average/1% low, in a 15-column cell: decimals go first, then the 1% low. */
+static void fps_cell(char *cell, int n, double fps, double p99)
+{
+    double low = p99 > 0 ? 1000.0 / p99 : 0.0;
+    snprintf(cell, n, "%.1f/%.1f fps", fps, low);
+    if (strlen(cell) > 15)
+        snprintf(cell, n, "%.0f/%.0f fps", fps, low);
+    if (strlen(cell) > 15)
+        snprintf(cell, n, "%.0f fps", fps);
+}
+
+/* The screen as text lines: score first, then every test in run order under
+ * its group or suite. Returns the line count. */
+static char out_lines[200][104];
+static int build_lines(void)
+{
+    int n = 0, i, t, m, ntags = (int)strlen(tags);
+    int lw = 80 - 1 - 3 - 16 * (ntags ? ntags : 1);   /* the label column */
+    const char *heading = "";
+#define OUT(...) do { if (n < 200) snprintf(out_lines[n++], sizeof out_lines[0], __VA_ARGS__); } while (0)
+    if (lw > 40)
+        lw = 40;
+    {
+        char row[100];
+        int x = snprintf(row, sizeof row, " %-*s", lw + 2, "DOSBench score");
+        for (t = 0; tags[t]; t++)
+            x += snprintf(row + x, sizeof row - x, " %-15.15s", tag_name(tags[t]));
+        OUT("%s", row);
     }
-    for (;;) {
-        line(1, A_TITLE, " DOSBench results (OUT\\RESULTS.TXT, latest run of each test)");
-        {
-            char head[100];
-            int x = snprintf(head, sizeof head, " %-7s %-9s", "test", "mode");
-            for (i = 0; tags[i]; i++)
-                x += snprintf(head + x, sizeof head - x, " %-20.20s", tag_name(tags[i]));
-            line(2, A_HEAD, "%s", head);
+    for (m = 0; m < nmodes && nscores; m++) {
+        char row[100], why[64] = "";
+        int x = snprintf(row, sizeof row, "   %-*s", lw, modes_seen[m]);
+        for (t = 0; tags[t]; t++) {
+            char cell[24] = "-";
+            for (i = 0; i < nscores; i++)
+                if (scores[i].tag == tags[t] && !strcmp(scores[i].mode, modes_seen[m])) {
+                    if (scores[i].score > 0)
+                        snprintf(cell, sizeof cell, "%.0f%s", scores[i].score,
+                                 strcmp(scores[i].status, "quick") ? "" : " (quick)");
+                    else {
+                        snprintf(cell, sizeof cell, "%s", scores[i].status);
+                        if (scores[i].missing[0] && !why[0])
+                            snprintf(why, sizeof why, "missing %s", scores[i].missing);
+                    }
+                }
+            x += snprintf(row + x, sizeof row - x, " %-15.15s", cell);
         }
-        for (i = 0; i < 19; i++) {
-            char row[100], test[8], mode[10];
-            int r = top + i, x, t;
-            if (r >= nkeys) {
-                line(3 + i, A_TEXT, nkeys ? "" : (i ? "" : " No results yet: run some tests first."));
-                continue;
-            }
-            sscanf(keys[r], "%7s %9s", test, mode);
-            x = snprintf(row, sizeof row, " %-7s %-9s", test, mode);
+        OUT("%s", row);
+        if (why[0])
+            OUT("     %s", why);
+    }
+    if (!nscores)
+        OUT("   no score: the game scenes make it, and none ran");
+    OUT("%s", "");
+    for (i = 0; menu_titles[i][0]; i++) {
+        const char *id = menu_titles[i][0], *parent = menu_titles[i][1];
+        const char *head = parent;
+        int any = 0, k;
+        for (k = 0; k < nres; k++)
+            any |= !strcmp(res[k].test, id);
+        if (!any)
+            continue;
+        if (!head[0]) {                         /* not a phase: its group heads it */
+            for (k = 0; menu_tests[k].id; k++)
+                if (!strcmp(menu_tests[k].id, id))
+                    head = menu_tests[k].group;
+        }
+        if (strcmp(head, heading)) {
+            const char *title = head;
+            for (k = 0; menu_suites[k].id; k++)
+                if (!strcmp(menu_suites[k].id, head))
+                    title = menu_suites[k].title;
+            for (k = 0; menu_groups[k][0]; k++)
+                if (!strcmp(menu_groups[k][0], head))
+                    title = menu_groups[k][1];
+            OUT(" %s", title);
+            heading = head;
+        }
+        for (m = 0; m < nmodes; m++) {
+            char row[100], label[48];
+            int x;
+            if (nmodes > 1) {
+                char mode[12];
+                snprintf(mode, sizeof mode, " %.9s", modes_seen[m]);
+                fit(label, lw - (int)strlen(mode), menu_titles[i][2]);
+                strcat(label, mode);
+            } else
+                fit(label, lw, menu_titles[i][2]);
+            x = snprintf(row, sizeof row, "   %-*s", lw, label);
             for (t = 0; tags[t]; t++) {
                 char cell[24] = "-";
                 for (k = 0; k < nres; k++)
-                    if (res[k].tag == tags[t] && !strcmp(res[k].test, test) && !strcmp(res[k].mode, mode)) {
-                        if (res[k].metric >= 0)
-                            snprintf(cell, sizeof cell, "%.1f %s %.0ffps", res[k].metric, res[k].unit, res[k].fps);
-                        else
-                            snprintf(cell, sizeof cell, "%.1f fps p99 %.0fms", res[k].fps, res[k].p99);
-                        break;
+                    if (res[k].tag == tags[t] && !strcmp(res[k].test, id) && !strcmp(res[k].mode, modes_seen[m])) {
+                        if (strcmp(res[k].status, "ok"))
+                            snprintf(cell, sizeof cell, "%s", res[k].status);
+                        else if (res[k].metric >= 0) {
+                            const char *unit;
+                            metric_key(id, &unit);
+                            snprintf(cell, sizeof cell, "%.1f %s", res[k].metric, unit);
+                        } else
+                            fps_cell(cell, sizeof cell, res[k].fps, res[k].p99);
                     }
-                x += snprintf(row + x, sizeof row - x, " %-20.20s", cell);
+                x += snprintf(row + x, sizeof row - x, " %-15.15s", cell);
             }
-            line(3 + i, A_TEXT, "%s", row);
+            OUT("%s", row);
+        }
+    }
+    if (!nres)
+        OUT(" No results yet: run some tests first.");
+    else
+        OUT(" (frame rates: average/1%% low)");
+#undef OUT
+    return n;
+}
+
+static void write_lines(const char *path, int n, const char *title)
+{
+    FILE *f = fopen(path, "w");
+    int i;
+    if (!f)
+        return;
+    fprintf(f, "%s\n", title);
+    for (i = 0; i < n; i++)
+        fprintf(f, "%s\n", out_lines[i]);
+    fclose(f);
+}
+
+/* session NULL: the latest of everything (V); else that session's results
+ * (after a run), also written to OUT\SUMMARY.TXT. */
+static void show_results(const char *session)
+{
+    int n, top = 0, ch, i;
+    char title[80];
+    load_results(session);
+    n = build_lines();
+    if (session)
+        snprintf(title, sizeof title, " DOSBench results: this run (session %s)", session);
+    else
+        snprintf(title, sizeof title, " DOSBench results: the latest of each test (OUT\\RESULTS.TXT)");
+    if (session)
+        write_lines("OUT\\SUMMARY.TXT", n, title);
+    for (;;) {
+        line(1, A_TITLE, "%s", title);
+        for (i = 0; i < 21; i++) {
+            int r = top + i;
+            line(2 + i, r < n && (out_lines[r][0] == ' ' && out_lines[r][1] != ' ') ? A_HEAD : A_TEXT,
+                 "%s", r < n ? out_lines[r] : "");
         }
         line(23, A_TEXT, "");
-        line(24, A_KEY, " Up/Down PgUp/PgDn scroll   Esc back");
+        line(24, A_KEY, " Up/Down PgUp/PgDn scroll   Esc back to the menu");
         gotoxy(1, 25);
         ch = getch();
-        if (ch == 27 || ch == 'q' || ch == 'Q')
+        if (ch == 27 || ch == 'q' || ch == 'Q' || ch == 13)
             return;
         if (ch == 0) {
             ch = getch();
             if (ch == 72 && top > 0) top--;
-            if (ch == 80 && top + 19 < nkeys) top++;
-            if (ch == 73) top = top > 19 ? top - 19 : 0;
-            if (ch == 81 && nkeys > 19) top = top + 19 < nkeys - 19 ? top + 19 : nkeys - 19;
+            if (ch == 80 && top + 21 < n) top++;
+            if (ch == 73) top = top > 21 ? top - 21 : 0;
+            if (ch == 81 && n > 21) top = top + 21 < n - 21 ? top + 21 : n - 21;
         }
     }
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     int cur = 0, top = 0, ch, i;
+    const char *dump = NULL, *session = NULL;
+    int results = 0;
     for (ntests = 0; menu_tests[ntests].id && ntests < MAX_TESTS; ntests++)
         ;
+    /* --results [--session ID]: the results screen (after a run: the last
+     * session); --dump FILE: the same as text, without the screen (Loop A). */
+    for (i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--results"))
+            results = 1;
+        else if (!strcmp(argv[i], "--session") && i + 1 < argc)
+            session = argv[++i];
+        else if (!strcmp(argv[i], "--dump") && i + 1 < argc)
+            dump = argv[++i];
+    }
+    if (results || dump) {
+        static char last[16];
+        if (!session) {
+            last_session(last, sizeof last);
+            session = last[0] && strcmp(last, "-") ? last : NULL;
+        }
+        if (dump) {
+            load_results(session);
+            write_lines(dump, build_lines(), "DOSBench results");
+            return 0;
+        }
+        textmode(C80);
+        _setcursortype(_NOCURSOR);
+        clrscr();
+        show_results(session);
+        textattr(A_TEXT);
+        clrscr();
+        _setcursortype(_NORMALCURSOR);
+        return 0;
+    }
     load_cfg();
     textmode(C80);
     _setcursortype(_NOCURSOR);
@@ -408,7 +648,7 @@ int main(void)
         case ' ': case 13: toggle(cur); break;
         case 'a': case 'A': for (i = 0; i < ntests; i++) sel[i] = 1; break;
         case 'n': case 'N': for (i = 0; i < ntests; i++) sel[i] = 0; break;
-        case 'v': case 'V': clrscr(); show_results(); clrscr(); break;
+        case 'v': case 'V': clrscr(); show_results(NULL); clrscr(); break;
         case 'r': case 'R':
             save_cfg();
             if (write_run() == 0) {

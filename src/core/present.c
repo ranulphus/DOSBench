@@ -165,3 +165,47 @@ int pr_summary(const test_def *suite, const db_result *r, int nr, int k, int n)
     rb_swap();
     return hold(2 * db.captions);
 }
+
+int pr_end(const score_acc *a, double score, int k, int n)
+{
+    char buf[128];
+    int b = body(), x = db.w / 16, y = db.h / 5, i;
+    const rb_info *in = rb_get_info();
+    if (db.captions <= 0)
+        return 0;
+    rb_clear(C_BG);
+    ov_begin();
+    header();
+    snprintf(buf, sizeof buf, "%s %dx%d: %s", strcmp(in->api, "glide") ? "OpenGL" : "Glide", db.w, db.h,
+             db.aborted ? "stopped" : "complete");
+    ov_text(x, y, b, C_ACCENT, buf);
+    y += OV_CH * b * 2;
+    if (a->selected) {
+        if (score > 0) {
+            snprintf(buf, sizeof buf, "DOSBench score %.0f%s", score, db.quick ? " (quick run)" : "");
+            ov_text(x, y, 2 * b, C_TITLE, buf);
+        } else {
+            ov_text(x, y, 2 * b, C_TITLE, "No score");
+        }
+        y += OV_CH * 2 * b * 2;
+        for (i = 0; i < a->n && y < db.h - db.h / 5; i++) {
+            const char *st = a->status[i];
+            if (!strcmp(st, "ok"))
+                snprintf(buf, sizeof buf, "%.1f fps", a->fps[i]);
+            else
+                snprintf(buf, sizeof buf, "%s", st[0] ? (!strcmp(st, "skip") ? "skipped" : "failed") : "not run");
+            ov_text(x, y, 1, C_TEXT, a->t[i]->title);
+            ov_text(db.w - x - ov_text_width(buf, 1), y, 1, strcmp(st, "ok") ? C_ACCENT : C_TEXT, buf);
+            y += OV_CH + 3;
+        }
+    } else {
+        snprintf(buf, sizeof buf, "%d tests run", k);
+        ov_text(x, y, 2 * b, C_TITLE, buf);
+        y += OV_CH * 2 * b * 2;
+        ov_wrap(x, y, db.w - 2 * x, 1, C_DIM, "The game scenes make the DOSBench score: select them for one.");
+    }
+    ov_text(x, db.h - db.h / 8, 1, C_DIM, "Results: OUT\\RESULTS.TXT; the results screen follows.");
+    (void)n;
+    rb_swap();
+    return hold(2 * db.captions);
+}

@@ -109,14 +109,16 @@ def scored():
     return [t["id"] for t in tests_in_order() if t["weight"] > 0]
 
 
-def score(fps_by_id):
-    """The score from {test: fps}; None unless every scored test has a positive fps."""
+def score(fps_by_id, weights=None):
+    """The score from {test: fps}; None unless every scored test has a positive fps.
+    weights {test: weight} replaces the registry's (report.py's selftest)."""
     reg = load()
-    ws = [(entry(i)["weight"], fps_by_id.get(i)) for i in scored()]
+    if weights is None:
+        weights = {i: entry(i)["weight"] for i in scored()}
+    ws = [(w, fps_by_id.get(i)) for i, w in weights.items()]
     if not ws or any(f is None or f <= 0 for _, f in ws):
         return None
-    total = sum(w for w, _ in ws)
-    return reg["score"]["scale"] * math.exp(sum(w * math.log(f) for w, f in ws) / total)
+    return score_of(ws, reg["score"]["scale"])
 
 
 def check():
@@ -206,6 +208,32 @@ def gen(out):
         open(out, "w").write(text)
 
 
+def score_of(pairs, scale=None):
+    """scale x the weighted geometric mean of [(weight, fps)]; 0 if any is not positive (score.c's score_of)."""
+    if scale is None:
+        scale = load()["score"]["scale"]
+    if not pairs or any(w <= 0 or f <= 0 for w, f in pairs):
+        return 0.0
+    return scale * math.exp(sum(w * math.log(f) for w, f in pairs) / sum(w for w, _ in pairs))
+
+
+def selftest_score():
+    """tests/fixtures/score.txt: 'w:fps ... -> score' per line."""
+    bad = n = 0
+    for line in open(os.path.join(ROOT, "tests", "fixtures", "score.txt")):
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        left, _, want = line.partition("->")
+        pairs = [(float(w), float(f)) for w, f in (x.split(":") for x in left.split())]
+        n += 1
+        if round(score_of(pairs, 100.0)) != int(want):
+            print("registry selftest: score %s = %.1f, want %s" % (left.strip(), score_of(pairs, 100.0), want.strip()))
+            bad += 1
+    print("registry selftest: %d score cases, %d failures" % (n, bad))
+    return bad
+
+
 def selftest():
     """tests/fixtures/select.txt: '<list> -> <ids in run order>' per line."""
     path = os.path.join(ROOT, "tests", "fixtures", "select.txt")
@@ -240,7 +268,7 @@ def main():
     elif cmd == "list":
         print(" ".join(select(sys.argv[2] if len(sys.argv) > 2 else "all")))
     elif cmd == "selftest":
-        sys.exit(1 if selftest() else 0)
+        sys.exit(1 if selftest() + selftest_score() else 0)
     else:
         sys.exit(__doc__)
 

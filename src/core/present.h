@@ -2,6 +2,7 @@
 #ifndef PRESENT_H
 #define PRESENT_H
 #include "bench.h"
+#include "score.h"
 
 /* A finished test, as the cards and captions show it. */
 typedef struct {
@@ -15,5 +16,7 @@ typedef struct {
 int pr_title(const test_def *d, int k, int n, const db_result *prev);
 int pr_caption(const test_def *d, tctx *t, int i, int ni, int k, int n, const db_result *prev);
 int pr_summary(const test_def *suite, const db_result *r, int nr, int k, int n);
+/* The last card of a mode: the score (or why there is none). */
+int pr_end(const score_acc *a, double score, int k, int n);
 
 #endif

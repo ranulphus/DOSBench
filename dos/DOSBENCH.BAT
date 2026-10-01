@@ -8,8 +8,7 @@ DBMENU.EXE
 IF ERRORLEVEL 2 GOTO RUN
 GOTO END
 :RUN
+REM RUNSEL.BAT ends with this run's results screen (DBMENU --results).
 CALL RUNSEL.BAT
-ECHO Press a key to return to the menu.
-PAUSE > NUL
 GOTO MENU
 :END

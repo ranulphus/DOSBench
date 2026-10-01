@@ -1,0 +1,22 @@
+# report.py selftest: S lines checked against their run's T lines.
+# Each S line's expect=N is how many problems rescore() must report.
+# weights: XA=1 XB=1
+H run=00000001 prog=BENCHGL ver=0.2 tag=G api=opengl impl=dosgl mode=640x480
+T run=00000001 prog=BENCHGL tag=G api=opengl mode=640x480 test=XA group=scene status=ok frames=200 fps=40.00
+T run=00000001 prog=BENCHGL tag=G api=opengl mode=640x480 test=XB group=scene status=ok frames=450 fps=90.00
+S run=00000001 prog=BENCHGL tag=G api=opengl mode=640x480 scorever=1 status=ok score=6000 scenes=2/2 XA=40.00 XB=90.00 expect=0
+# a score that does not follow from the fps
+H run=00000002 prog=BENCHGL ver=0.2 tag=G api=opengl impl=dosgl mode=640x480
+T run=00000002 prog=BENCHGL tag=G api=opengl mode=640x480 test=XA group=scene status=ok fps=40.00
+T run=00000002 prog=BENCHGL tag=G api=opengl mode=640x480 test=XB group=scene status=ok fps=90.00
+S run=00000002 prog=BENCHGL tag=G api=opengl mode=640x480 scorever=1 status=ok score=6100 scenes=2/2 XA=40.00 XB=90.00 expect=1
+# a skipped scene: incomplete, no score, nothing wrong
+H run=00000003 prog=BENCHG ver=0.2 tag=M api=glide impl=g450 mode=640x480
+T run=00000003 prog=BENCHG tag=M api=glide mode=640x480 test=XA group=scene status=ok fps=40.00
+T run=00000003 prog=BENCHG tag=M api=glide mode=640x480 test=XB group=scene status=skip fps=0.00
+S run=00000003 prog=BENCHG tag=M api=glide mode=640x480 scorever=1 status=incomplete scenes=1/2 XA=40.00 missing=XB:skip expect=0
+# a scene's fps that differs from its T line, and an incomplete run with a score
+H run=00000004 prog=BENCHGL ver=0.2 tag=G api=opengl impl=dosgl mode=800x600
+T run=00000004 prog=BENCHGL tag=G api=opengl mode=800x600 test=XA group=scene status=ok fps=40.00
+T run=00000004 prog=BENCHGL tag=G api=opengl mode=800x600 test=XB group=scene status=fail fps=0.00
+S run=00000004 prog=BENCHGL tag=G api=opengl mode=800x600 scorever=1 status=incomplete score=4000 scenes=1/2 XA=41.00 missing=XB:fail expect=2

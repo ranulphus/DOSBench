@@ -48,6 +48,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -75,6 +76,7 @@ def make_vars():
 VARS = make_vars()
 MGA = VARS["MGA_GLIDE"]
 sys.path.insert(0, os.path.join(MGA, "tools"))
+import registry  # noqa: E402  (tools/, next to this script)
 CACHE = os.environ.get("MGA_CACHE", os.path.expanduser("~/.cache/mga-glide"))
 REF_OVL = os.environ.get("REF_OVL", os.path.join(CACHE, "fixtures", "ovl", "gta.ovl"))
 DATA_DOS = "C:\\DOSBENCH\\DATA"
@@ -122,7 +124,8 @@ def data_files():
 
 def loopa_job(card, a):
     out = os.path.join(ROOT, "out", "loopa", card)
-    common = "--tests %s --data %s --shots --noexit" % (a.tests, DATA_DOS)
+    session = "%08x" % (int(time.time()) & 0xFFFFFFFF)
+    common = "--tests %s --data %s --shots --noexit --session %s" % (a.tests, DATA_DOS, session)
     if not a.full:
         common += " --quick"
     if a.modes:
@@ -134,6 +137,7 @@ def loopa_job(card, a):
     open(argfile, "w", newline="\r\n").write(common + "\n")
     files = ["%s=/TEST/BENCHG.EXE" % os.path.join(ROOT, "build/dos/BENCHG.EXE"),
              "%s=/TEST/BENCHGL.EXE" % os.path.join(ROOT, "build/dos/BENCHGL.EXE"),
+             "%s=/TEST/DBMENU.EXE" % os.path.join(ROOT, "build/dos/DBMENU.EXE"),
              "%s=/TEST/ARGS.TXT" % argfile]
     for f in data_files():
         files.append("%s=/DOSBENCH/DATA/%s" % (f, os.path.basename(f).upper()))
@@ -148,6 +152,11 @@ def loopa_job(card, a):
         else:
             files.append("%s=/REF/GLIDE2X.OVL" % REF_OVL)
             cmds.append("C:\\TEST\\BENCHG.EXE %s --glide=C:\\REF\\GLIDE2X.OVL --tag V" % common)
+    # The results screen's text (check_summary compares it with report.py's reading).
+    cmds += ["C:", "CD \\", "SERSAY HX-START DBMENU",
+             "C:\\TEST\\DBMENU.EXE --results --session %s --dump C:\\OUT\\SUMMARY.TXT" % session,
+             "SERSAY HX-DONE 0"]
+    open(os.path.join(ROOT, "out", "loopa", "session-%s.txt" % card), "w").write(session + "\n")
     cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "loopa", "run.py"),
            "--name", "dosbench-" + card, "--card", card, "--out", out,
            "--ovl", os.path.join(MGA, "build", "ow", "GLIDE2X.OVL"),
@@ -156,7 +165,7 @@ def loopa_job(card, a):
         cmd += ["--file", f]
     for c in cmds:
         cmd += ["--cmd", c]
-    print("loopa %s: %d programs, %d data files" % (card, len(cmds), len(data_files())))
+    print("loopa %s: %d programs, %d data files, session %s" % (card, len(cmds) - 5, len(data_files()), session))
     subprocess.run(cmd, cwd=ROOT)
     return out
 
@@ -239,6 +248,78 @@ def compare_images(dirs):
     return results
 
 
+def summary_cell(r):
+    """A result as DBMENU's results screen shows it (menu.c build_lines), cut to its 15 columns."""
+    if r.get("rec") == "score":
+        if r.get("score") is not None and r.get("status") in ("ok", "quick"):
+            c = "%.0f%s" % (r["score"], " (quick)" if r["status"] == "quick" else "")
+        else:
+            c = r.get("status", "")
+    elif r.get("status") != "ok":
+        c = r.get("status", "")
+    else:
+        key, unit = registry.primary(r["test"])
+        if key != "fps":
+            c = "%.1f %s" % (float(r.get(key, 0)), unit)
+        else:                                   # menu.c fps_cell
+            fps, p99 = float(r.get("fps", 0)), float(r.get("p99_ms", 0))
+            low = 1000.0 / p99 if p99 > 0 else 0.0
+            c = "%.1f/%.1f fps" % (fps, low)
+            if len(c) > 15:
+                c = "%.0f/%.0f fps" % (fps, low)
+            if len(c) > 15:
+                c = "%.0f fps" % fps
+    return c[:15]
+
+
+def same_cell(a, b):
+    """Two cells that differ at most by one unit in the last digit shown (C and
+    Python round a printed tie such as 19.65 differently)."""
+    num = re.compile(r"\d+(?:\.\d+)?")
+    if num.sub("#", a) != num.sub("#", b):
+        return False
+    for x, y in zip(num.findall(a), num.findall(b)):
+        unit = 10.0 ** -len(x.partition(".")[2])
+        if abs(float(x) - float(y)) > unit * 1.001:
+            return False
+    return True
+
+
+def check_summary(out):
+    """DBMENU --dump (files/SUMMARY.TXT) against files/RESULTS.TXT read by report.py: the
+    same cells (scores and each test's figure) for the run's session. Problems as text."""
+    import collections
+    import report
+    res, dump = os.path.join(out, "files", "RESULTS.TXT"), os.path.join(out, "files", "SUMMARY.TXT")
+    sfile = os.path.join(ROOT, "out", "loopa", "session-%s.txt" % os.path.basename(out))
+    if not os.path.exists(dump):
+        return ["no SUMMARY.TXT (DBMENU --dump did not run)"]
+    session = open(sfile).read().strip() if os.path.exists(sfile) else None
+    probs = []
+    recs = [r for r in report.read_results(res, warn=probs.append) if r.get("session") == session]
+    want = sorted(summary_cell(r) for r in recs)
+    lw = min(40, 80 - 4 - 16 * max(1, len({r.get("tag") for r in recs})))   # menu.c build_lines
+    got = []
+    for line in open(dump, encoding="latin-1").read().replace("\r", "").split("\n")[1:]:
+        if not re.match(r"^   \S", line) or line.startswith("   no score:"):
+            continue
+        for i in range(3 + lw, len(line), 16):
+            c = line[i + 1:i + 16].rstrip()
+            if c and c != "-":
+                got.append(c)
+    if not recs:
+        probs.append("no records of session %s" % session)
+    for c in want:
+        k = next((k for k, g in enumerate(got) if same_cell(c, g)), None)
+        if k is None:
+            probs.append("DBMENU lacks %r" % c)
+        else:
+            del got[k]
+    for g in got:
+        probs.append("DBMENU has extra %r" % g)
+    return probs
+
+
 def fill_glide_display(out):
     """Glide cannot tell BENCHG how MGA-Glide shows a size: take it from the
     runtime's MGL-WINOPEN lines (display=WxH fit=F), in order, into the H
@@ -280,6 +361,12 @@ def cmd_loopa(a):
             else:
                 print("  %s MISSING" % s["tag"])
         json.dump(summary, open(os.path.join(out, "programs.json"), "w"), indent=1)
+        probs = check_summary(out)
+        for p in probs:
+            print("  results screen: %s" % p)
+        if not probs:
+            print("  results screen: agrees with report.py")
+        all_ok = all_ok and not probs
     all_ok = report_checks(dirs) and all_ok
     print("loopa: %s" % ("PASS" if all_ok else "FAIL"))
     return 0 if all_ok else 1

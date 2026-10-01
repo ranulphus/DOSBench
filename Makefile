@@ -98,7 +98,7 @@ build/dos/DBMENU.EXE: src/menu/menu.c build/gen/registry.h
 
 # ---- Host unit tests ------------------------------------------------------
 HOST_CFLAGS := -std=gnu99 -O1 -g -Wall -Wextra -Werror -Isrc/core -Isrc/backend -Ibuild/gen -I$(MGA_GLIDE)/include
-UNIT_TESTS := stats vmath clip tex timer scene select
+UNIT_TESTS := stats vmath clip tex timer scene select score
 UNIT_stats := src/core/stats.c
 UNIT_vmath := src/core/vmath.c
 UNIT_clip  := src/core/clip.c
@@ -107,6 +107,7 @@ UNIT_timer := src/core/timer.c src/core/stats.c
 UNIT_scene := src/core/scene.c src/core/vmath.c
 UNIT_select := src/core/select.c src/core/registry.c
 build/host/test_select: build/gen/registry.h
+UNIT_score := src/core/score.c
 .SECONDEXPANSION:
 build/host/test_%: tests/unit/test_%.c tests/unit/unit.c tests/unit/unit.h $$(UNIT_$$*) $(wildcard src/core/*.h src/backend/*.h)
 	@mkdir -p $(dir $@)
@@ -118,6 +119,7 @@ tests-host: $(UNIT_TESTS:%=build/host/test_%) build/host/selftest.dbs
 	@set -e; for t in $(UNIT_TESTS:%=build/host/test_%); do echo "== $$t"; $$t; done
 	$(Q)$(PYTHON) tools/registry.py check
 	$(Q)$(PYTHON) tools/registry.py selftest
+	$(Q)$(PYTHON) tools/report.py selftest
 
 # ---- Content and runs -----------------------------------------------------
 data:

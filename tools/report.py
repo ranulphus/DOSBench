@@ -5,15 +5,21 @@
       Read DIR/files/RESULTS.TXT (a Loop A or bench job's output) or
       DIR/RESULTS.TXT and append its records to results/<pc>.jsonl (one JSON
       object per test result, header fields merged in; duplicates skipped).
+      Each score (S line) is recomputed from its run's test lines; a
+      difference is reported.
   report.py table [FILES...] [--latest] [--mode 640x480] [--include-loopa]
-      Text tables: one row per test, one column per target (pc, api, impl).
+      Text tables: the score card (the DOSBench score per mode and target),
+      then one row per test, one column per target (pc, api, impl).
+  report.py selftest
+      Score lines against tests/fixtures/results.txt (part of make tests-host).
   report.py html [FILES...] [--out out/report.html] [--include-loopa]
-      A self-contained page: per-group tables, bar charts comparing targets,
+      A self-contained page: the score card, per-group tables, bar charts comparing targets,
       runs over time, and derived figures (state-change cost). Publish it as
       a private page when asked; nothing leaves the machine otherwise.
 
 Records from Loop A describe the emulator, not hardware: they are kept
-apart (source=loopa) and left out of tables and pages unless asked for.
+apart (source=loopa), left out of tables and pages unless asked for, and
+marked "(emulator)" when included.
 """
 import argparse
 import glob
@@ -44,33 +50,71 @@ def primary(test):
 
 def parse_line(line):
     parts = line.split()
-    if not parts or parts[0] not in ("H", "T"):
+    if not parts or parts[0] not in ("H", "T", "S"):
         return None
     rec = {"kind": parts[0]}
     for p in parts[1:]:
         if "=" in p:
             k, v = p.split("=", 1)
-            rec[k] = float(v) if NUMERIC.match(v) and k not in ("run", "crc", "build") else v
+            rec[k] = float(v) if NUMERIC.match(v) and k not in ("run", "crc", "build", "session") else v
     return rec
 
 
-def read_results(path):
-    heads, tests = {}, []
+def score_rec(s):
+    """An S line as a record: the scenes' fps under "fps", the rest as is."""
+    fixed = ("run", "prog", "tag", "api", "mode", "scorever", "status", "score", "scenes", "missing")
+    rec = {k: v for k, v in s.items() if k in fixed}
+    rec["fps"] = {k: v for k, v in s.items() if k.isupper()}      # test ids are upper case
+    rec["rec"] = "score"
+    return rec
+
+
+def rescore(s, tests, weights=None):
+    """Problems with an S record against its run's T records (same run and mode), as text."""
+    fps = {t["test"]: t.get("fps") for t in tests if t.get("status") == "ok"}
+    got = registry.score(fps, weights)
+    probs = []
+    if s.get("scorever") != registry.load()["score"]["scorever"]:
+        return ["scorever %s, the registry's is %s: recomputation skipped" %
+                (s.get("scorever"), registry.load()["score"]["scorever"])]
+    for tid, f in s["fps"].items():
+        if fps.get(tid) is None or abs(fps[tid] - f) > 0.011:
+            probs.append("%s %.2f fps, its T line %s" % (tid, f, fps.get(tid)))
+    if s.get("status") in ("ok", "quick"):
+        if got is None or abs(got - s.get("score", 0)) > 1:
+            probs.append("score %s, recomputed %s" % (s.get("score"), "none" if got is None else "%.0f" % got))
+    elif s.get("score") is not None:
+        probs.append("status %s carries a score" % s.get("status"))
+    return probs
+
+
+def read_results(path, warn=None, weights=None):
+    heads, tests, scores = {}, [], []
     for line in open(path, encoding="latin-1"):
         rec = parse_line(line.strip())
         if not rec:
             continue
         if rec["kind"] == "H":
             heads[(rec.get("run"), rec.get("mode"))] = rec
+        elif rec["kind"] == "S":
+            scores.append(score_rec(rec))
         else:
             tests.append(rec)
     out = []
-    for t in tests:
+    for t in tests + scores:
         h = heads.get((t.get("run"), t.get("mode")), {})
         rec = {k: v for k, v in h.items() if k not in ("kind",)}
         rec.update({k: v for k, v in t.items() if k != "kind"})
         out.append(rec)
+    for s in scores:
+        same = [t for t in tests if t.get("run") == s.get("run") and t.get("mode") == s.get("mode")]
+        for p in rescore(s, same, weights):
+            (warn or print)("report: %s run %s %s: %s" % (s.get("prog"), s.get("run"), s.get("mode"), p))
     return out
+
+
+def rkey(r):
+    return (r.get("run"), r.get("mode"), r.get("test") or "S")
 
 
 def load(files):
@@ -90,6 +134,8 @@ def default_files():
 def target(r):
     """A column: where and how the numbers were taken."""
     where = r.get("pc") or "?"
+    if r.get("source") == "loopa":
+        where += " (emulator)"
     api = "Glide" if r.get("api") == "glide" else "OpenGL"
     impl = r.get("impl", "")
     if r.get("tag") == "V":
@@ -127,11 +173,11 @@ def cmd_ingest(a):
         seen = set()
         if os.path.exists(out):
             for r in load([out]):
-                seen.add((r.get("run"), r.get("mode"), r.get("test")))
+                seen.add(rkey(r))
         n = 0
         with open(out, "a") as f:
             for r in recs:
-                key = (r.get("run"), r.get("mode"), r.get("test"))
+                key = rkey(r)
                 if key in seen:
                     continue
                 r.update(source=a.source, pc=pc, when=stamp)
@@ -144,13 +190,44 @@ def cmd_ingest(a):
 
 
 # ---- selection ------------------------------------------------------------
-def select(recs, a):
-    recs = [r for r in recs if r.get("status") == "ok"]
+def select(recs, a, kind="test"):
+    """Test records with status ok (kind "test") or score records (kind "score"), filtered by the options."""
+    if kind == "score":
+        recs = [r for r in recs if r.get("rec") == "score"]
+    else:
+        recs = [r for r in recs if r.get("rec") != "score" and r.get("status") == "ok"]
     if not a.include_loopa:
         recs = [r for r in recs if r.get("source") != "loopa"]
     if a.mode:
         recs = [r for r in recs if r.get("mode") == a.mode]
     return recs
+
+
+def latest_scores(recs):
+    """The newest score record per (target, mode)."""
+    best = {}
+    for r in recs:
+        k = (target(r), r.get("mode"))
+        if k not in best or r.get("when", "") >= best[k].get("when", ""):
+            best[k] = r
+    return best
+
+
+def score_cell(r):
+    """('4356', 'quick run, 4/4 scenes') or ('incomplete', 'G2RACE skip') for a score record."""
+    if r is None:
+        return None, ""
+    if r.get("scorever") != registry.load()["score"]["scorever"]:
+        return "old", "score version %s" % r.get("scorever")
+    st = r.get("status")
+    if st in ("ok", "quick") and r.get("score") is not None:
+        return "%.0f" % r["score"], ("quick run, " if st == "quick" else "") + "%s scenes" % r.get("scenes")
+    why = ", ".join(m.replace(":", " ") for m in str(r.get("missing", "")).split(",") if m)
+    return st, why or "%s scenes" % r.get("scenes")
+
+
+SCORE_WHAT = ("100 x the geometric mean of the game scenes' average frame rates, from one program run per "
+              "mode; no reference machine. A run that misses a scene has no score.")
 
 
 def latest_by(recs):
@@ -188,9 +265,6 @@ def shown_in(best, mode):
 def matrix(recs):
     best = latest_by(recs)
     targets = sorted({k[0] for k in best})
-    def area(m):
-        w, _, h = (m or "0x0").partition("x")
-        return (int(w) * int(h) if w.isdigit() and h.isdigit() else 0, m or "")
     modes = sorted({k[1] for k in best}, key=area)
     tests = []
     for k in best:
@@ -208,12 +282,32 @@ def fmt(v):
     return "%.0f" % v if v >= 100 else "%.1f" % v if v >= 10 else "%.2f" % v
 
 
+def area(m):
+    w, _, h = (m or "0x0").partition("x")
+    return (int(w) * int(h) if w.isdigit() and h.isdigit() else 0, m or "")
+
+
 def cmd_table(a):
-    recs = select(load(a.files or default_files()), a)
-    if not recs:
+    every = load(a.files or default_files())
+    recs, srecs = select(every, a), select(every, a, "score")
+    if not recs and not srecs:
         print("report: no records (use --include-loopa for Loop A runs)")
         return 1
     best, targets, modes, tests, _ = matrix(recs)
+    sbest = latest_scores(srecs)
+    targets = sorted(set(targets) | {k[0] for k in sbest})
+    smodes = sorted({k[1] for k in sbest}, key=area)
+    if smodes:
+        print("== %s: %s" % (registry.load()["score"]["title"], SCORE_WHAT))
+        for i, t in enumerate(targets):
+            print("  [%d] %s" % (i + 1, t))
+        for mode in smodes:
+            cells = []
+            for i, t in enumerate(targets):
+                v, why = score_cell(sbest.get((t, mode)))
+                if v is not None:
+                    cells.append("[%d] %s%s" % (i + 1, v, " (%s)" % why if why else ""))
+            print("  %-10s %s" % (mode, "   ".join(cells)))
     for mode in modes:
         print("\n== %s%s" % (mode, shown_in(best, mode)))
         for i, t in enumerate(targets):
@@ -258,6 +352,7 @@ thead th { color: var(--muted); font-weight: 600; }
 td.what { color: var(--muted); white-space: normal; min-width: 180px; }
 svg text { fill: var(--fg); font-size: 11px; } svg .muted { fill: var(--muted); }
 .note { color: var(--muted); font-size: 13px; }
+.score { font-size: 20px; font-weight: 700; }
 """
 COLOURS = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--c6)"]
 
@@ -309,11 +404,14 @@ def history(recs, test, key, targets, width=520, height=120):
 
 
 def cmd_html(a):
-    recs = select(load(a.files or default_files()), a)
-    if not recs:
+    every = load(a.files or default_files())
+    recs, srecs = select(every, a), select(every, a, "score")
+    if not recs and not srecs:
         print("report: no records (use --include-loopa for Loop A runs)")
         return 1
     best, targets, modes, tests, group_of = matrix(recs)
+    sbest = latest_scores(srecs)
+    targets = sorted(set(targets) | {k[0] for k in sbest})
     body = ["<h1>DOSBench results</h1>",
             '<p class="lede">Glide 2.x and OpenGL 1.1 under DOS: the same tests through each API. '
             "Latest run per target; %d records, generated %s.%s</p>" %
@@ -322,6 +420,26 @@ def cmd_html(a):
     body.append('<ul class="targets">' + "".join(
         '<li><span class="sw" style="background:%s"></span>%s</li>' % (COLOURS[i % len(COLOURS)], html.escape(t))
         for i, t in enumerate(targets)) + "</ul>")
+    smodes = sorted({k[1] for k in sbest}, key=area)
+    if smodes:
+        body.append("<h2>%s</h2>" % html.escape(registry.load()["score"]["title"]))
+        body.append('<p class="note">%s</p>' % html.escape(SCORE_WHAT))
+        rows = []
+        for mode in smodes:
+            cells = []
+            for tg in targets:
+                v, why = score_cell(sbest.get((tg, mode)))
+                cells.append("<td>%s</td>" % ("-" if v is None else '<span class="score">%s</span>%s' % (
+                    html.escape(v), "<br><span class=note>%s</span>" % html.escape(why) if why else "")))
+            rows.append("<tr><td>%s</td><td>score</td>%s</tr>" % (html.escape(mode), "".join(cells)))
+        head = "".join("<th>[%d]</th>" % (i + 1) for i in range(len(targets)))
+        body.append('<div class="scroll"><table><thead><tr><th>mode</th><th>metric</th>%s</tr></thead>'
+                    "<tbody>%s</tbody></table></div>" % (head, "".join(rows)))
+        for mode in smodes:
+            vals = [sbest.get((tg, mode), {}).get("score") for tg in targets]
+            vals = [v if v is not None and sbest[(tg, mode)].get("status") in ("ok", "quick") else None
+                    for tg, v in zip(targets, vals)]
+            body.append(bars("score, %s" % mode, "score", vals))
     for mode in modes:
         body.append("<h2>%s</h2>" % html.escape(mode + shown_in(best, mode)))
         for g, gname in GROUPS:
@@ -368,6 +486,34 @@ def cmd_html(a):
     return 0
 
 
+def cmd_selftest(a):
+    """tests/fixtures/results.txt: each S line's expect=N is how many problems rescore() must find."""
+    path = os.path.join(ROOT, "tests", "fixtures", "results.txt")
+    weights, expect = {}, {}
+    for line in open(path):
+        if line.startswith("# weights:"):
+            weights = {k: float(v) for k, v in (x.split("=") for x in line.split(":", 1)[1].split())}
+        rec = parse_line(line.strip())
+        if rec and rec["kind"] == "S":
+            expect[rec["run"]] = int(rec.get("expect", 0))
+    found = {}
+    def warn(msg):
+        run = msg.split(" run ", 1)[1].split()[0]
+        found[run] = found.get(run, 0) + 1
+    recs = read_results(path, warn, weights)
+    bad = 0
+    for run, n in sorted(expect.items()):
+        if found.get(run, 0) != n:
+            print("report selftest: run %s: %d problems, want %d" % (run, found.get(run, 0), n))
+            bad += 1
+    cells = {r["run"]: score_cell(r) for r in recs if r.get("rec") == "score"}
+    if cells.get("00000001") != ("6000", "2/2 scenes") or cells.get("00000003") != ("incomplete", "XB skip"):
+        print("report selftest: score cells %s" % cells)
+        bad += 1
+    print("report selftest: %d score lines, %d failures" % (len(expect), bad))
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="what", required=True)
@@ -382,8 +528,9 @@ def main():
         p.add_argument("--include-loopa", action="store_true")
         if name == "html":
             p.add_argument("--out", default=os.path.join(ROOT, "out", "report.html"))
+    sub.add_parser("selftest")
     a = ap.parse_args()
-    return {"ingest": cmd_ingest, "table": cmd_table, "html": cmd_html}[a.what](a)
+    return {"ingest": cmd_ingest, "table": cmd_table, "html": cmd_html, "selftest": cmd_selftest}[a.what](a)
 
 
 if __name__ == "__main__":

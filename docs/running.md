@@ -35,6 +35,7 @@ BENCHG  [options] --glide=PATH      Glide via an OVL (DOS/4GW; needs DOS4GW.EXE)
                       run it with SET MGAGLIDE=res=640x512 and --modes 640x480
   --secs S            seconds per timed test (default: 3 per feature phase, 5 per model)
   --captions S        hold each title card or caption S seconds (default 1; 0: none)
+  --session ID        written on the H lines (the menu: one id per run of the menu's selection)
   --submit arrays|lists|immediate   OpenGL static geometry path (default arrays)
   --vsync             sync swaps to the retrace
   --shots             save one frame per test as <out>\<tag><ID>.PPM, in one mode:
@@ -48,7 +49,8 @@ BENCHG  [options] --glide=PATH      Glide via an OVL (DOS/4GW; needs DOS4GW.EXE)
   --list              list the tests
 ```
 
-Results go to `<out>\RESULTS.TXT` (docs/methodology.md) and COM1.
+Results go to `<out>\RESULTS.TXT` (docs/methodology.md) and COM1. The last
+card of each mode shows the DOSBench score, or why there is none.
 
 ## The menu
 
@@ -60,8 +62,18 @@ and `build/data/*` as `DATA\`. Then `DOSBENCH`:
 - choose the APIs, modes, vsync, the OpenGL submission path, seconds per
   test, frame saving and the tests (Space toggles, A all, N none);
 - R runs them: the menu writes `TESTS.LST` and `RUNSEL.BAT` and exits, the
-  batch file runs each program on its own and returns to the menu;
-- V shows `OUT\RESULTS.TXT`: the latest figures per test, mode and program.
+  batch file runs each program on its own (all with one `--session` id),
+  then shows the results screen for that run and returns to the menu;
+- V shows the results screen for everything in `OUT\RESULTS.TXT`: the
+  latest figures per test, mode and program.
+
+The results screen starts with the score card (the DOSBench score per mode
+and program, or `incomplete` with the missing scenes), then every test in
+run order under its group or suite: the test's figure (Mpix/s, Ktris/s,
+Mtex/s) or, for frame-rate tests, `average/1% low` fps. After a run it is
+also written to `OUT\SUMMARY.TXT`. `DBMENU --results [--session ID]` shows
+it without the menu; `DBMENU --dump FILE [--session ID]` writes it as text
+without touching the screen (Loop A).
 
 ## A machine to try it by hand
 
@@ -113,8 +125,12 @@ that card cannot draw the same way: on the G100, S1BLND (stipple blending)
 is compared through a 4x4 box filter and L1LQ2P (a pass that multiplies by
 the destination) is advisory.
 
-Output: `out/loopa/<card>/` (`serial.log`, `files/RESULTS.TXT`, `*.png`,
-`diff/`, `programs.json`, `checks.json`).
+After the programs, the job runs `DBMENU --dump` for the job's session and
+checks that the results screen shows the same scores and figures that
+`tools/report.py` reads from `RESULTS.TXT` (a failure fails the run).
+
+Output: `out/loopa/<card>/` (`serial.log`, `files/RESULTS.TXT`,
+`files/SUMMARY.TXT`, `*.png`, `diff/`, `programs.json`, `checks.json`).
 
 The game tests (`docs/tests.md`, group `game`) need DOS-GL's Quake and
 Half-Life builds (`make quake`, `make halflife` in DOS-GL) and the game
@@ -173,6 +189,9 @@ python3 tools/report.py table --include-loopa       # with Loop A records (emula
 ```
 
 `results/<pc>.jsonl` holds the bench records (committed); Loop A records
-(`results/loopa-*.jsonl`) are not committed. The page compares every target
-(PC, API, runtime or library) per test: tables, bars, runs over time, and
-the derived state-change cost.
+(`results/loopa-*.jsonl`) are not committed, and are marked `(emulator)`
+when included. Both start with the score card: the latest DOSBench score per
+mode and target, or `incomplete` and the missing scenes. The page then
+compares every target (PC, API, runtime or library) per test: tables, bars,
+runs over time, and the derived state-change cost. The real games' timedemos
+come last, under "Real games (not in the score)".

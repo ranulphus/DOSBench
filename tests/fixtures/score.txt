@@ -1,0 +1,8 @@
+# The score: weight:fps pairs -> 100 x the weighted geometric mean, rounded.
+# Checked by tests/unit/test_score.c (score.c) and tools/registry.py selftest.
+1:40 1:50 1:60 1:30 -> 4356
+1:100 1:100 1:100 1:100 -> 10000
+1:45.2 1:50.1 1:60.3 1:30.0 -> 4499
+2:20 1:80 -> 3175
+1:12.5 -> 1250
+1:0 1:50 -> 0

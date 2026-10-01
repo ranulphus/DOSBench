@@ -78,6 +78,24 @@ run, the frames match); performance numbers come from the bench (Loop B).
 `tools/report.py` keeps Loop A records apart and leaves them out unless
 asked.
 
+## The score
+
+The DOSBench score is 100 x the geometric mean of the game scenes' average
+frame rates (the registry's `weight` > 0 tests; equal weights), per program
+run and mode. There is no reference machine: a score is a frame rate on a
+log scale, so twice the frame rate in every scene doubles it, and one slow
+scene cannot dominate it the way an arithmetic mean of frame rates lets the
+fastest scene dominate.
+
+A score needs every scored scene from the same program run and mode. A
+skipped or failed scene (or one left out of `--tests`) gives no score: the
+run is `incomplete`, with the missing scenes and why. A run stopped with Esc
+is `aborted`. A `--quick` run still gets a score, marked `quick`: its frame
+rates come from a few frames and mean little. The feature tests, models and
+real games are reported beside the score, never in it. `scorever` is bumped
+whenever the scenes or the formula change; scores of different versions are
+not compared.
+
 ## Output
 
 `<out>\RESULTS.TXT` (default `C:\OUT`), appended, one line per record,
@@ -86,12 +104,21 @@ space-separated `key=value`:
 - `H` lines, one per program run and mode: `run` (an id), `prog`, `ver`,
   `build`, `tag` (L OpenGL, G Glide, V Glide on 3dfx's runtime), `api`,
   `impl` (runtime or library version), `card`, `mode`, `vsync`, `submit`,
-  `timer`, `cpu_mhz`, `tex_kb`, `quick`.
+  `timer`, `cpu_mhz`, `tex_kb`, `quick`, `session` (`--session`: the menu
+  gives every program of one run the same id; `-` without one).
 - `T` lines, one per test: `run`, `prog`, `tag`, `api`, `mode`, `test`,
   `group`, `parent` (the suite, for its phases), `status` (ok, skip, fail),
   `frames`, `secs`, `fps`, `avg_ms`,
   `med_ms`, `p99_ms`, `min_ms`, `max_ms`, `submit_ms`, `tris_frame`, the
   rates (`ktris_s`, `mpix_s`, `mtexel_s`), `tex_kb_frame`, `crc` of the
   saved frame, and test notes (`changes=`, `copies=`, `why=`...).
+- `S` lines, one per program run and mode that selected a scored scene,
+  after its last test: `run`, `prog`, `tag`, `api`, `mode`, `scorever`,
+  `status` (ok, quick, incomplete, aborted), `score` (only when ok or
+  quick), `scenes=k/n` (scenes with a result, of those scored), each scene's
+  fps as `ID=fps`, and `missing=ID:why,...`. `tools/report.py ingest`
+  recomputes each score from the run's `T` lines and reports a difference;
+  `tests/fixtures/score.txt` holds cases the C code and `tools/registry.py`
+  must both compute the same.
 
 The same lines go over COM1 as `HX-STAT bench ...` for the harness.
