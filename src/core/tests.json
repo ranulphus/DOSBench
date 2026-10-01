@@ -1,5 +1,5 @@
 {
- "_about": "DOSBench's test registry: the one list both programs, the menu, tools/report.py and tools/run.py are built from (tools/registry.py generates build/gen/registry.h). File order is run order. A suite is a heading over the tests that name it as parent (its phases); a phase keeps its own test id and T line. impl names the code that draws it (a test_impl in src/core); param and file go to that code unchanged. metric is the T-line key a test is judged by, unit how it is shown; weight > 0 puts a test in the score; secs (a group's or a test's) is how long a timed test runs unless --secs says otherwise (default 5).",
+ "_about": "DOSBench's test registry: the one list both programs, the menu, tools/report.py and tools/run.py are built from (tools/registry.py generates build/gen/registry.h). File order is run order. A suite is a heading over the tests that name it as parent (its phases); a phase keeps its own test id and T line. impl names the code that draws it (a test_impl in src/core); param and file go to that code unchanged. metric is the T-line key a test is judged by, unit how it is shown; weight > 0 puts a test in the score; budget (scenes) is what make scene-stats holds the host replay to (average triangles per frame, within -25%/+30%); secs (a group's or a test's) is how long a timed test runs unless --secs says otherwise (default 5).",
  "version": 2,
  "score": {"title": "DOSBench score", "scale": 100, "mean": "geometric", "metric": "fps", "scorever": 1,
            "_why": "100 x the geometric mean of the scored tests' average frame rates: no reference machine, and one slow scene cannot dominate it"},
@@ -18,6 +18,8 @@
  "tests": [
   {"id": "B0TRI", "group": "basic", "impl": "basic", "title": "Basic check", "what": "clear, one Gouraud triangle, one textured quad"},
   {"id": "B1SCN", "group": "basic", "impl": "scene", "file": "GSTEST.DBS", "title": "Scene runtime check", "what": "every game-scene feature in one small scene: lit, animated and distant models, a track, orbits, particles, sky and fog"},
+
+  {"id": "G3SPAC", "group": "scene", "impl": "scene", "file": "SPACE.DBS", "weight": 1, "budget": {"tris": 10000}, "title": "Space battle", "what": "a station, a cruiser, two fighter squadrons and an asteroid field: many objects, each moved and lit on the CPU; lasers and explosions"},
 
   {"id": "GALLERY", "group": "model", "suite": true, "title": "Model gallery", "what": "static meshes from 0.7k to 69k triangles, orbited, textured and lit"},
   {"id": "M1TP4K", "parent": "GALLERY", "impl": "model", "file": "TPOT4K.DBS", "title": "Utah teapot, 4.5k triangles", "what": "Utah teapot, 4.5k triangles, Gouraud"},

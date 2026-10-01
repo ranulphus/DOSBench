@@ -84,6 +84,8 @@ SCENES = {
     # Game scenes: made by a generator function ("module:function", in tools/), nothing fetched.
     "GSTEST": ("game", "dbs:selftest2_scene", [], "DOSBench (procedural)", CC0,
                "the scene runtime's check: every feature in one small scene"),
+    "SPACE": ("game", "scene_space:build", [], "DOSBench (procedural)", CC0,
+              "Space battle: a station, a cruiser, fighters and an asteroid field"),
 }
 LIGHT = (0.40, 0.80, 0.45)
 

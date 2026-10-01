@@ -13,6 +13,8 @@ writes `build/data/*.DBS` and `build/data/CREDITS.TXT`.
 | SUZANNE | Suzanne by Norbert Nopper (UX3D), Khronos glTF Sample Assets | CC0-1.0 |
 | AVOCADO | Avocado (Microsoft), Khronos glTF Sample Assets | CC0-1.0 |
 | LQE0M1 | LibreQuake v0.09-beta `lite.zip`, `pak0.pak`: `maps/lq_e0m1.bsp` and `gfx/palette.lmp` | BSD-3-Clause (maps, textures; the release's `docs/COPYING`) |
+| SPACE | procedural: `tools/scene_space.py` with `gsgen.py`, `meshgen.py`, `texgen.py` (PCG32 seeds; nothing fetched) | CC0-1.0 |
+| GSTEST | procedural: `tools/dbs.py` (`selftest2_scene`), the scene runtime's check | CC0-1.0 |
 
 The Khronos models are pinned to commit `7d4ba189` of
 `KhronosGroup/glTF-Sample-Assets`. The Stanford scans are for research use:

@@ -311,7 +311,13 @@ def check_summary(out):
                 got.append(c)
     if not recs:
         probs.append("no records of session %s" % session)
-    for c in want:
+    rest = []
+    for c in want:                                  # exact first: a near miss must not take another's cell
+        if c in got:
+            got.remove(c)
+        else:
+            rest.append(c)
+    for c in rest:
         k = next((k for k, g in enumerate(got) if same_cell(c, g)), None)
         if k is None:
             probs.append("DBMENU lacks %r" % c)

@@ -42,6 +42,7 @@ def load():
             t.setdefault("gl_only", False)
             t.setdefault("headline", "")
             t.setdefault("derive", "")
+            t.setdefault("budget", {})
             by[t["id"]] = t
         reg["by_id"] = by
         _reg = reg

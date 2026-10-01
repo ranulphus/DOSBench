@@ -63,6 +63,11 @@ def main():
         r = runs["fwd"]
         same = len({x["hash"] for x in runs.values()}) == 1
         note = "ok" if same else "DIFFERS: " + " ".join("%s=%s" % (k, v["hash"]) for k, v in runs.items())
+        want = t["budget"].get("tris")
+        avg = float(r["tris"].split("/")[0])
+        if want and not 0.75 * want <= avg <= 1.3 * want:
+            note += "; %.0f triangles a frame, budget %d" % (avg, want)
+            same = False
         if t["id"] in old and old[t["id"]] != r["hash"]:
             note += "; CHANGED from %s" % old[t["id"]]
             same = False

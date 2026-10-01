@@ -443,8 +443,8 @@ static void draw_pass(gs_world *w, int i, int pass)
         batch_state(w, b, 0, &st);
         gs_set_state(w, &st);
         gs_bind(w, b->tex != SC_NONE ? sc->rtex[b->tex] : NULL);
-        if (w->cpu[k]) {
-            gsfx_vertices(w, i, k, lit ? lut : NULL);
+        if (w->cpu[k]) {                        /* additive and glowing batches give light: never lit */
+            gsfx_vertices(w, i, k, lit && pass != P_ADD ? lut : NULL);
             rb_draw(w->vbuf, (int)b->vcount, sc->idx + b->ifirst, (int)b->icount);
         } else
             rb_mesh_draw(sc->mesh[k]);

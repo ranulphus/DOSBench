@@ -22,6 +22,21 @@ a file.
 | B0TRI | clear, one Gouraud triangle, one bilinear textured quad | the whole path works: load, open, draw, read back, results |
 | B1SCN | `GSTEST.DBS`, 100 frames: every game-scene feature in one small scene (a lit model with a distant level of detail, a banked track, an orbit, spinning and animated models, a decal, blended, additive and glowing quads, scrolling, warping, ramping and flickering surfaces, smoke, sparks and a shockwave, sky, fog, and a camera shot of each kind) | the scene runtime draws the same through both APIs and on every card |
 
+## Game scenes (group `scene`, scored)
+
+Short game-like 3D sequences, the bulk of a run and the only tests in the
+DOSBench score (docs/methodology.md). Each is a version 2 `.DBS` file made by
+a generator in `tools/` (procedural, permissively licensed or built from
+LibreQuake) and drawn by the scene runtime (`src/core/gs.c`): every frame of
+its story once, at 25 story frames per second, with camera shots cut between
+them. Frame f is a pure function of f, so every card draws the same frames;
+what differs is how long they take. `make scene-stats` shows what each asks of
+a card per frame, from a host replay.
+
+| ID | Scene | Per frame (host replay, 640x480) | Stresses |
+|---|---|---|---|
+| G3SPAC | Space battle (`SPACE.DBS`, `tools/scene_space.py`), 1000 frames: a station with a spinning ring, a cruiser crossing the field, 200 spinning asteroids at three levels of detail, two teams of nine fighters on banked loops, laser bolts, five fighters lost (fireball, sparks, debris, smoke, shockwave), a last explosion on the cruiser; stars, nebulae and a planet around the camera | about 12k triangles, 100 draw calls, 2.8 screens of fill | many objects, each with its own transform and CPU lighting; draw calls; additive particles |
+
 ## Synthetic (group `synth`)
 
 Geometry is laid out in pixels and drawn through the standard perspective
