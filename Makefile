@@ -2,6 +2,7 @@
 #
 #   make                  BENCHG.EXE (Glide), BENCHGL.EXE (OpenGL), DBMENU.EXE
 #   make tests-host       host unit tests
+#   make scene-stats      replay the scenes on the host: determinism, triangles, fill
 #   make data             fetch and convert the scenes (tools/assets.py)
 #   make loopa CARD=g450  run both programs in 86Box (tools/run.py)
 #   make check-deps       sibling checkouts at or after the pinned commits
@@ -14,7 +15,7 @@ Q ?= @
 MGAHAL := $(DOSGL)/third_party/mgahal
 
 CORE_SRCS := $(wildcard src/core/*.c)
-.PHONY: all deps check-deps tests-host data loopa clean help
+.PHONY: all deps check-deps tests-host data loopa clean help scene-stats
 all: build/dos/BENCHG.EXE build/dos/BENCHGL.EXE build/dos/DBMENU.EXE
 
 # ---- Sibling checkouts --------------------------------------------------
@@ -97,8 +98,9 @@ build/dos/DBMENU.EXE: src/menu/menu.c build/gen/registry.h
 	@if [ -e "$(@:.EXE=.exe)" ] && ! [ "$(@:.EXE=.exe)" -ef "$@" ]; then rm -f "$(@:.EXE=.exe)"; fi
 
 # ---- Host unit tests ------------------------------------------------------
-HOST_CFLAGS := -std=gnu99 -O1 -g -Wall -Wextra -Werror -Isrc/core -Isrc/backend -Ibuild/gen -I$(MGA_GLIDE)/include
-UNIT_TESTS := stats vmath clip tex timer scene select score
+HOST_CFLAGS := -std=gnu99 -O1 -g -Wall -Wextra -Werror -Isrc/core -Isrc/backend -Itests/host -Ibuild/gen \
+               -I$(MGA_GLIDE)/include
+UNIT_TESTS := stats vmath clip tex timer scene select score gs
 UNIT_stats := src/core/stats.c
 UNIT_vmath := src/core/vmath.c
 UNIT_clip  := src/core/clip.c
@@ -108,15 +110,35 @@ UNIT_scene := src/core/scene.c src/core/vmath.c
 UNIT_select := src/core/select.c src/core/registry.c
 build/host/test_select: build/gen/registry.h
 UNIT_score := src/core/score.c
+UNIT_gs    := src/core/gs.c src/core/gsfx.c src/core/scene.c src/core/vmath.c src/core/cull.c src/core/dbutil.c \
+              tests/host/rb_stub.c
+build/host/test_gs: build/host/selftest2.dbs
 .SECONDEXPANSION:
 build/host/test_%: tests/unit/test_%.c tests/unit/unit.c tests/unit/unit.h $$(UNIT_$$*) $(wildcard src/core/*.h src/backend/*.h)
 	@mkdir -p $(dir $@)
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $< tests/unit/unit.c $(UNIT_$*) -lm
+# Scene replay on the host (tests/host): every frame of a level, model or
+# scene test through a stub backend: hashes, triangles, draw calls, fill.
+REPLAY_SRCS := tests/host/screplay.c tests/host/rb_stub.c src/core/dbutil.c src/core/level.c src/core/model.c \
+               src/core/scene.c src/core/vmath.c src/core/cull.c src/core/bspvis.c src/core/gs.c src/core/gsfx.c \
+               src/core/scenes.c
+build/host/screplay: $(REPLAY_SRCS) tests/host/rb_stub.h $(wildcard src/core/*.h src/backend/*.h) build/gen/registry.h
+	@mkdir -p $(dir $@)
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -Itests/host -o $@ $(REPLAY_SRCS) -lm
+scene-stats: build/host/screplay
+	$(Q)$(PYTHON) tools/scene_stats.py
+
+build/host/selftest2.dbs: tools/dbs.py
+	@mkdir -p $(dir $@)
+	$(Q)$(PYTHON) tools/dbs.py --selftest2 $@
 build/host/selftest.dbs: tools/dbs.py
 	@mkdir -p $(dir $@)
 	$(Q)$(PYTHON) tools/dbs.py --selftest $@
-tests-host: $(UNIT_TESTS:%=build/host/test_%) build/host/selftest.dbs
+tests-host: $(UNIT_TESTS:%=build/host/test_%) build/host/selftest.dbs build/host/selftest2.dbs build/host/screplay
 	@set -e; for t in $(UNIT_TESTS:%=build/host/test_%); do echo "== $$t"; $$t; done
+	@set -e; for o in fwd rev shuf; do build/host/screplay scene build/host/selftest2.dbs --data . --order $$o; done \
+	  | awk '{ for (i = 1; i <= NF; i++) if ($$i ~ /^hash=/) h[$$i]++ } END { n = 0; for (k in h) n++; \
+	          print "== scene replay: " (n == 1 ? "the same frames forward, reversed and shuffled" : "FRAMES DIFFER"); exit n != 1 }'
 	$(Q)$(PYTHON) tools/registry.py check
 	$(Q)$(PYTHON) tools/registry.py selftest
 	$(Q)$(PYTHON) tools/report.py selftest

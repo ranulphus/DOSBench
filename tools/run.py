@@ -130,6 +130,8 @@ def loopa_job(card, a):
         common += " --quick"
     if a.modes:
         common += " --modes " + a.modes
+    if a.shot_frames:
+        common += " --shot-frames " + a.shot_frames
     # The options go in a file (--args): DOS/4GW passes BENCHG only about 100
     # characters, which a --modes list and the Voodoo run's options exceed.
     os.makedirs(os.path.join(ROOT, "out", "loopa"), exist_ok=True)
@@ -784,6 +786,7 @@ def main():
     p.add_argument("--modes", default="")
     p.add_argument("--no-ref", dest="ref", action="store_false")
     p.add_argument("--full", action="store_true", help="full frame counts (slow in 86Box)")
+    p.add_argument("--shot-frames", default="", help="also save these frames of camera-path tests (F,F,...)")
     p.add_argument("--timeout", type=int, default=3600)
     p.add_argument("--idle", type=int, default=300)
     p = sub.add_parser("games")

@@ -14,6 +14,7 @@ baked into vertex colours here: a fixed directional light in world space,
 with the camera orbiting the model.
 """
 import argparse
+import glob
 import hashlib
 import io
 import json
@@ -80,6 +81,9 @@ SCENES = {
                 "Suzanne by Norbert Nopper (UX3D), Khronos glTF Sample Assets", CC0, "Suzanne, textured"),
     "AVOCADO": ("gltf", {"file": "Avocado.glb"}, ["Avocado.glb"],
                 "Avocado (Microsoft), Khronos glTF Sample Assets", CC0, "Avocado, textured"),
+    # Game scenes: made by a generator function ("module:function", in tools/), nothing fetched.
+    "GSTEST": ("game", "dbs:selftest2_scene", [], "DOSBench (procedural)", CC0,
+               "the scene runtime's check: every feature in one small scene"),
 }
 LIGHT = (0.40, 0.80, 0.45)
 
@@ -441,12 +445,24 @@ def conv_gltf(args):
     return s
 
 
-CONVERTERS = {"teapot": conv_teapot, "ply": conv_ply, "gltf": conv_gltf}
+def conv_game(args):
+    """A game scene from its generator, "module:function" in tools/; it must pass Scene.check()."""
+    import importlib
+    mod, fn = args.split(":")
+    s = getattr(importlib.import_module(mod), fn)()
+    probs = s.check()
+    if probs:
+        raise SystemExit("convert: %s: %s" % (args, "; ".join(probs)))
+    return s
+
+
+CONVERTERS = {"teapot": conv_teapot, "ply": conv_ply, "gltf": conv_gltf, "game": conv_game}
 
 
 def convert(names=None, force=False):
     os.makedirs(OUT, exist_ok=True)
     tools = [os.path.join(HERE, f) for f in ("assets.py", "dbs.py", "bsp.py") if os.path.exists(os.path.join(HERE, f))]
+    tools += glob.glob(os.path.join(HERE, "scene_*.py")) + glob.glob(os.path.join(HERE, "gsgen.py"))
     stamp = max(os.path.getmtime(t) for t in tools)
     credits = ["DOSBench scene data: sources and licences (docs/content.md).", ""]
     scenes = dict(SCENES)

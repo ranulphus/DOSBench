@@ -11,7 +11,17 @@ the test shim and the shared HAL, the Loop A and bench harnesses) and DOS-GL
 make                      # build/dos/BENCHG.EXE, BENCHGL.EXE, DBMENU.EXE
 make tests-host           # host unit tests
 make data                 # fetch the sources, convert build/data/*.DBS (tools/assets.py)
+make scene-stats          # replay every level, model and scene test on the host
 ```
+
+`make scene-stats` (`tools/scene_stats.py`) draws every frame of each scene
+test through a stub backend (`tests/host/rb_stub.c`) three times, forward,
+reversed and shuffled, and fails unless the frames match. It prints what a
+scene asks of a card per frame (triangles, draw calls, texture binds, pixels
+filled in screens, of which blended), the numbers scene budgets are set
+from: 86Box's speed says nothing about a real card's. `--save FILE` and
+`--against FILE` keep and compare the frames' hashes across a change that
+must not alter any frame.
 
 `make` first builds what it needs in the sibling checkouts (MGA-Glide's
 generated Glide table, HAL library, `GLIDE2X.OVL` and DOS helpers; DOS-GL's

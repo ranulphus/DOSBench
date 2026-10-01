@@ -16,6 +16,16 @@ void m4_lookat(mat4 *m, const float eye[3], const float at[3], const float up[3]
 void m4_translate(mat4 *m, float x, float y, float z);          /* m = m * T */
 void m4_scale(mat4 *m, float x, float y, float z);              /* m = m * S */
 void m4_rotate_y(mat4 *m, float deg);                           /* m = m * Ry */
+void m4_rotate_x(mat4 *m, float deg);                           /* m = m * Rx */
+void m4_rotate_z(mat4 *m, float deg);                           /* m = m * Rz */
+void m4_rotate_axis(mat4 *m, const float axis[3], float deg);   /* m = m * R(axis) */
+/* m = m * Ry(yaw) * Rx(pitch) * Rz(roll): models face +z with +y up, so yaw
+ * 90 turns them to face +x, pitch 90 to face -y. */
+void m4_ypr(mat4 *m, float yaw, float pitch, float roll);
+/* A model's placement: +z along fwd, +y towards up, scaled by s, at pos. */
+void m4_from_frame(mat4 *m, const float pos[3], const float fwd[3], const float up[3], float s);
+/* out = the transposed upper 3x3 of m times v (into a rotation's frame). */
+void m4_rot_inv(const mat4 *m, const float v[3], float out[3]);
 /* out = m * (v, 1) */
 void m4_xform(const mat4 *m, const float v[3], float out[4]);
 

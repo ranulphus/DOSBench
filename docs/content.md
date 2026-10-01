@@ -61,3 +61,45 @@ sections (4-character tag, 32-bit length, payload padded to 4 bytes):
 `src/core/scene.c` reads a file into one buffer and uses the sections in
 place, after checking every count and range against the file size
 (`tests/unit/test_scene.c` truncates a file at every 7th byte).
+
+### Version 2: game scenes
+
+A scene with a GHDR section is written as version 2; every other file stays
+version 1, byte for byte. Version 2 adds batch flags 32 (additive), 64 (glow:
+additive, never fogged) and 128 (decal), and these sections (fixed-size
+records after a u32 count unless noted; field by field in `tools/dbs.py`'s
+docstring and `src/core/scene.h`):
+
+| Tag | Content |
+|---|---|
+| NRML | a table of up to 256 unit normals, then one u8 index per vertex (lit models) |
+| GHDR | frames, story rate (25 frames/s), clear colour, fog, field of view, near and far planes, sun direction and colour, ambient colour, seed, sky model, the frame saved for image checks |
+| MODL | models: a run of batches, flags (lit on the CPU, animated), the next level of detail and the distance it takes over, bounding sphere |
+| VANM | vertex animations: per frame and vertex, x, y, z and a normal index in bytes, with a scale and origin (Quake MDL's packing) |
+| TRAK | tracks: evenly spaced keys (position, roll), open or closed; Catmull-Rom between them |
+| INST | instances: model, motion (static, along a track, spinning, orbiting), parent, the frames it exists, animation |
+| PART | particle kinds: texture, additive or blended, flat or facing the camera, life, size, speed, spread, gravity, drag, rise, colours, spin |
+| EMIT | emitters: a particle kind at a steady rate from a point on an instance (or in the world) |
+| FXEV | bursts: a number of particles at one frame |
+| CAMS | shots: from frame to frame, a camera on a track, chasing, fixed, mounted on an instance, or orbiting |
+| SURF | batch effects: scrolling, warping (Quake water), lights switching on and off, pulsing or flickering |
+
+Rules for game-scene content, so every card and runtime draws the same:
+
+- Additive batches and particles blend ONE, ONE: alpha plays no part, so an
+  additive texture carries its shape in its colour (black outside it).
+  Blended ones (smoke, water, clouds) carry it in alpha.
+- Particle and sprite textures are at least 32x32: an 8x8 texture magnified
+  across a third of the screen shows where each runtime puts its bilinear
+  texel centres (3dfx's and MGA-Glide's differ by half a texel).
+- No multitexturing and no DST_COLOR passes outside the Arena, so the G100
+  draws what the others draw (it stipples blends and skips multiplies).
+
+`tools/dbs.py`'s `Scene.check()` refuses a game scene whose textures need
+more than 1920 KB at 16 bits with mip chains (the 2 MB Glide TMU less room
+for the overlay font), whose texture coordinates pass 32, whose references
+point nowhere, or whose frames are not all covered by a shot. The runtime
+(`src/core/gs.c`, `gsfx.c`) draws frame f as a pure function of f: nothing
+carries from one frame to the next (particles are recomputed from their
+emitter, number and birth time), so `make scene-stats` replays every frame
+forward, reversed and shuffled on the host and the three must match.

@@ -17,6 +17,7 @@
  ],
  "tests": [
   {"id": "B0TRI", "group": "basic", "impl": "basic", "title": "Basic check", "what": "clear, one Gouraud triangle, one textured quad"},
+  {"id": "B1SCN", "group": "basic", "impl": "scene", "file": "GSTEST.DBS", "title": "Scene runtime check", "what": "every game-scene feature in one small scene: lit, animated and distant models, a track, orbits, particles, sky and fog"},
 
   {"id": "GALLERY", "group": "model", "suite": true, "title": "Model gallery", "what": "static meshes from 0.7k to 69k triangles, orbited, textured and lit"},
   {"id": "M1TP4K", "parent": "GALLERY", "impl": "model", "file": "TPOT4K.DBS", "title": "Utah teapot, 4.5k triangles", "what": "Utah teapot, 4.5k triangles, Gouraud"},

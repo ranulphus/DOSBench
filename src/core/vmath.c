@@ -85,6 +85,74 @@ void m4_rotate_y(mat4 *mt, float deg)
     m4_mul(mt, mt, &t);
 }
 
+void m4_rotate_x(mat4 *mt, float deg)
+{
+    mat4 t;
+    float c = (float)cos(deg * VM_PI / 180.0), s = (float)sin(deg * VM_PI / 180.0);
+    m4_identity(&t);
+    t.m[5] = c; t.m[6] = s; t.m[9] = -s; t.m[10] = c;
+    m4_mul(mt, mt, &t);
+}
+
+void m4_rotate_z(mat4 *mt, float deg)
+{
+    mat4 t;
+    float c = (float)cos(deg * VM_PI / 180.0), s = (float)sin(deg * VM_PI / 180.0);
+    m4_identity(&t);
+    t.m[0] = c; t.m[1] = s; t.m[4] = -s; t.m[5] = c;
+    m4_mul(mt, mt, &t);
+}
+
+void m4_rotate_axis(mat4 *mt, const float axis[3], float deg)
+{
+    mat4 t;
+    float a[3], c = (float)cos(deg * VM_PI / 180.0), s = (float)sin(deg * VM_PI / 180.0), k = 1 - c;
+    float *m = t.m;
+    a[0] = axis[0]; a[1] = axis[1]; a[2] = axis[2];
+    v3_norm(a);
+    m4_identity(&t);
+    M(0, 0) = a[0] * a[0] * k + c;        M(1, 0) = a[0] * a[1] * k - a[2] * s; M(2, 0) = a[0] * a[2] * k + a[1] * s;
+    M(0, 1) = a[1] * a[0] * k + a[2] * s; M(1, 1) = a[1] * a[1] * k + c;        M(2, 1) = a[1] * a[2] * k - a[0] * s;
+    M(0, 2) = a[2] * a[0] * k - a[1] * s; M(1, 2) = a[2] * a[1] * k + a[0] * s; M(2, 2) = a[2] * a[2] * k + c;
+    m4_mul(mt, mt, &t);
+}
+
+void m4_ypr(mat4 *mt, float yaw, float pitch, float roll)
+{
+    if (yaw != 0)
+        m4_rotate_y(mt, yaw);
+    if (pitch != 0)
+        m4_rotate_x(mt, pitch);
+    if (roll != 0)
+        m4_rotate_z(mt, roll);
+}
+
+void m4_from_frame(mat4 *mt, const float pos[3], const float fwd[3], const float up[3], float s)
+{
+    float x[3], y[3], z[3];
+    float *m = mt->m;
+    z[0] = fwd[0]; z[1] = fwd[1]; z[2] = fwd[2];
+    v3_norm(z);
+    v3_cross(x, up, z);
+    v3_norm(x);
+    v3_cross(y, z, x);
+    m4_identity(mt);
+    M(0, 0) = x[0] * s; M(0, 1) = x[1] * s; M(0, 2) = x[2] * s;
+    M(1, 0) = y[0] * s; M(1, 1) = y[1] * s; M(1, 2) = y[2] * s;
+    M(2, 0) = z[0] * s; M(2, 1) = z[1] * s; M(2, 2) = z[2] * s;
+    M(3, 0) = pos[0]; M(3, 1) = pos[1]; M(3, 2) = pos[2];
+}
+
+void m4_rot_inv(const mat4 *mt, const float v[3], float out[3])
+{
+    const float *m = mt->m;
+    float r[3];
+    int c;
+    for (c = 0; c < 3; c++)
+        r[c] = M(c, 0) * v[0] + M(c, 1) * v[1] + M(c, 2) * v[2];
+    out[0] = r[0]; out[1] = r[1]; out[2] = r[2];
+}
+
 void m4_xform(const mat4 *mt, const float v[3], float out[4])
 {
     const float *m = mt->m;

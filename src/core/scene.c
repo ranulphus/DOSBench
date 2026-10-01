@@ -15,6 +15,144 @@ static uint32_t u32(const uint8_t *p)
 
 #define FAIL(...) do { snprintf(err, (size_t)errlen, __VA_ARGS__); return -1; } while (0)
 
+/* The version 2 records are used in place: their sizes are the format's. */
+typedef char sc_size_check[(sizeof(sc_ghdr) == 88 && sizeof(sc_model) == 32 && sizeof(sc_inst) == 80 &&
+                            sizeof(sc_part) == 64 && sizeof(sc_emit) == 48 && sizeof(sc_fxev) == 32 &&
+                            sizeof(sc_cam) == 64 && sizeof(sc_surf) == 32 && sizeof(sc_batch) == 48) ? 1 : -1];
+
+/* A section of n fixed-size records after a u32 count. */
+static const void *records(const uint8_t *p, uint32_t len, uint32_t size, int *n)
+{
+    if (len < 4 || 4 + (uint64_t)u32(p) * size > len)
+        return NULL;
+    *n = (int)u32(p);
+    return p + 4;
+}
+
+static int parse_tracks(scene *s, const uint8_t *p, uint32_t len, char *err, int errlen)
+{
+    uint32_t n, k, o = 4;
+    if (len < 4)
+        FAIL("TRAK too short");
+    n = u32(p);
+    s->track = (sc_track *)calloc(n ? n : 1, sizeof *s->track);
+    if (!s->track)
+        FAIL("out of memory");
+    for (k = 0; k < n; k++) {
+        sc_track *t = &s->track[k];
+        if (o + 12 > len)
+            FAIL("TRAK truncated");
+        t->nkeys = u32(p + o);
+        t->flags = u32(p + o + 4);
+        memcpy(&t->length, p + o + 8, 4);
+        t->keys = (const float *)(p + o + 12);
+        o += 12 + t->nkeys * 16;
+        if (t->nkeys < 2 || o > len)
+            FAIL("TRAK track %u bad", (unsigned)k);
+    }
+    s->ntrack = (int)n;
+    return 0;
+}
+
+static int parse_anims(scene *s, const uint8_t *p, uint32_t len, char *err, int errlen)
+{
+    uint32_t n, k, o = 4;
+    if (len < 4)
+        FAIL("VANM too short");
+    n = u32(p);
+    s->anim = (sc_anim *)calloc(n ? n : 1, sizeof *s->anim);
+    if (!s->anim)
+        FAIL("out of memory");
+    for (k = 0; k < n; k++) {
+        sc_anim *a = &s->anim[k];
+        if (o + 36 > len)
+            FAIL("VANM truncated");
+        a->nverts = u32(p + o);
+        a->nframes = u32(p + o + 4);
+        a->vfirst = u32(p + o + 8);
+        memcpy(a->scale, p + o + 12, 12);
+        memcpy(a->origin, p + o + 24, 12);
+        a->data = p + o + 36;
+        o += 36 + a->nframes * a->nverts * 4;
+        if (!a->nframes || o > len)
+            FAIL("VANM animation %u bad", (unsigned)k);
+    }
+    s->nanim = (int)n;
+    return 0;
+}
+
+static int parse_normals(scene *s, const uint8_t *p, uint32_t len, char *err, int errlen)
+{
+    uint32_t n, nv;
+    if (len < 4)
+        FAIL("NRML too short");
+    n = u32(p);
+    if (n > 256 || 8 + n * 12 > len)
+        FAIL("NRML table bad");
+    s->nnormal = (int)n;
+    s->normal = (const float *)(p + 4);
+    nv = u32(p + 4 + n * 12);
+    if (8 + n * 12 + nv > len)
+        FAIL("NRML truncated");
+    s->vnormal = p + 8 + n * 12;
+    if ((long)nv != s->nvert)
+        FAIL("NRML has %u vertices, VERT %ld", (unsigned)nv, s->nvert);
+    return 0;
+}
+
+#define NONE_OR(v, n) ((v) == SC_NONE || (int)(v) < (n))
+
+/* Every index a version 2 file holds points at something. */
+static int check_v2(scene *s, char *err, int errlen)
+{
+    int i;
+    const sc_ghdr *g = s->ghdr;
+    if (!g->frames || g->rate <= 0)
+        FAIL("GHDR frames %u rate %g", (unsigned)g->frames, (double)g->rate);
+    if (!NONE_OR(g->sky, s->nmodel))
+        FAIL("GHDR sky model %u", (unsigned)g->sky);
+    for (i = 0; i < s->nmodel; i++) {
+        const sc_model *m = &s->model[i];
+        if (m->batch0 + m->nbatch > s->nbatch || !NONE_OR(m->lod_next, s->nmodel) || m->lod_next == (uint16_t)i)
+            FAIL("model %d out of range", i);
+        if ((m->flags & SC_MF_LIT) && !s->vnormal)
+            FAIL("model %d is lit but there is no NRML", i);
+        if ((m->flags & SC_MF_ANIM) && m->anim >= s->nanim)
+            FAIL("model %d animation %u", i, (unsigned)m->anim);
+    }
+    for (i = 0; i < s->nanim; i++)
+        if ((long)(s->anim[i].vfirst + s->anim[i].nverts) > s->nvert)
+            FAIL("animation %d vertices out of range", i);
+    for (i = 0; i < s->ninst; i++) {
+        const sc_inst *n = &s->inst[i];
+        if (n->model >= s->nmodel || !(n->parent == SC_NONE || n->parent < i) || !NONE_OR(n->track, s->ntrack) ||
+            (n->kind == SC_IK_TRACK && n->track == SC_NONE) || n->kind > SC_IK_ORBIT)
+            FAIL("instance %d out of range", i);
+    }
+    for (i = 0; i < s->npart; i++)
+        if (!NONE_OR(s->part[i].tex, s->ntex) || s->part[i].life <= 0)
+            FAIL("particle kind %d bad", i);
+    for (i = 0; i < s->nemit; i++)
+        if (s->emit[i].part >= s->npart || !NONE_OR(s->emit[i].inst, s->ninst) || s->emit[i].rate <= 0)
+            FAIL("emitter %d bad", i);
+    for (i = 0; i < s->nfxev; i++)
+        if (s->fxev[i].part >= s->npart || !NONE_OR(s->fxev[i].inst, s->ninst))
+            FAIL("burst %d bad", i);
+    for (i = 0; i < s->ncam; i++) {
+        const sc_cam *c = &s->cam[i];
+        if (!NONE_OR(c->target, s->ninst) || !NONE_OR(c->track, s->ntrack) || !NONE_OR(c->look_track, s->ntrack) ||
+            c->kind > SC_CK_ORBIT || (c->kind == SC_CK_PATH && c->track == SC_NONE) ||
+            ((c->kind == SC_CK_CHASE || c->kind == SC_CK_MOUNT) && c->target == SC_NONE))
+            FAIL("shot %d bad", i);
+    }
+    if (!s->ncam)
+        FAIL("no CAMS shots");
+    for (i = 0; i < s->nsurf; i++)
+        if (s->surf[i].batch >= s->nbatch || s->surf[i].kind > SC_SK_PULSE)
+            FAIL("surface %d bad", i);
+    return 0;
+}
+
 static int parse_view(scene *s, const uint8_t *p, uint32_t len, char *err, int errlen)
 {
     sc_view *v = &s->view;
@@ -47,8 +185,9 @@ int sc_parse(scene *s, uint8_t *buf, long size, char *err, int errlen)
     memset(s, 0, sizeof *s);
     s->file = buf;
     s->size = size;
-    if (size < 16 || memcmp(buf, "DBS1", 4) || u32(buf + 4) != 1)
-        FAIL("not a version 1 DBS file");
+    if (size < 16 || memcmp(buf, "DBS1", 4) || u32(buf + 4) < 1 || u32(buf + 4) > 2)
+        FAIL("not a version 1 or 2 DBS file");
+    s->version = (int)u32(buf + 4);
     nsec = u32(buf + 8);
     for (i = 0; i < nsec; i++) {
         const uint8_t *p;
@@ -100,6 +239,41 @@ int sc_parse(scene *s, uint8_t *buf, long size, char *err, int errlen)
         } else if (!memcmp(buf + off, "INFO", 4)) {
             s->info = (const char *)p;
             s->info_size = (long)len;
+        } else if (s->version >= 2) {
+            const char *tag = (const char *)(buf + off);
+            int bad = 0;
+            if (!memcmp(tag, "GHDR", 4)) {
+                if (len < sizeof(sc_ghdr))
+                    FAIL("GHDR too short");
+                s->ghdr = (const sc_ghdr *)p;
+            } else if (!memcmp(tag, "MODL", 4))
+                bad = !(s->model = (const sc_model *)records(p, len, sizeof(sc_model), &s->nmodel));
+            else if (!memcmp(tag, "INST", 4))
+                bad = !(s->inst = (const sc_inst *)records(p, len, sizeof(sc_inst), &s->ninst));
+            else if (!memcmp(tag, "PART", 4))
+                bad = !(s->part = (const sc_part *)records(p, len, sizeof(sc_part), &s->npart));
+            else if (!memcmp(tag, "EMIT", 4))
+                bad = !(s->emit = (const sc_emit *)records(p, len, sizeof(sc_emit), &s->nemit));
+            else if (!memcmp(tag, "FXEV", 4))
+                bad = !(s->fxev = (const sc_fxev *)records(p, len, sizeof(sc_fxev), &s->nfxev));
+            else if (!memcmp(tag, "CAMS", 4))
+                bad = !(s->cam = (const sc_cam *)records(p, len, sizeof(sc_cam), &s->ncam));
+            else if (!memcmp(tag, "SURF", 4))
+                bad = !(s->surf = (const sc_surf *)records(p, len, sizeof(sc_surf), &s->nsurf));
+            else if (!memcmp(tag, "TRAK", 4)) {
+                if (parse_tracks(s, p, len, err, errlen) < 0)
+                    return -1;
+            } else if (!memcmp(tag, "VANM", 4)) {
+                if (parse_anims(s, p, len, err, errlen) < 0)
+                    return -1;
+            } else if (!memcmp(tag, "NRML", 4)) {
+                if (!s->vert)
+                    FAIL("NRML before VERT");
+                if (parse_normals(s, p, len, err, errlen) < 0)
+                    return -1;
+            }
+            if (bad)
+                FAIL("%.4s truncated", tag);
         }
         off += 8 + len + ((4 - (len & 3)) & 3);
     }
@@ -110,6 +284,8 @@ int sc_parse(scene *s, uint8_t *buf, long size, char *err, int errlen)
             FAIL("batch %u out of range", (unsigned)i);
         s->tris += b->icount / 3;
     }
+    if (s->ghdr)
+        return check_v2(s, err, errlen);
     if (!s->view.frames)
         FAIL("no VIEW section");
     return 0;
@@ -179,6 +355,8 @@ void sc_free(scene *s)
     free(s->mesh);
     free(s->rtex);
     free(s->tex);
+    free(s->track);
+    free(s->anim);
     free(s->file);
     memset(s, 0, sizeof *s);
 }

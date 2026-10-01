@@ -20,6 +20,7 @@ a file.
 | ID | Draws | Checks |
 |---|---|---|
 | B0TRI | clear, one Gouraud triangle, one bilinear textured quad | the whole path works: load, open, draw, read back, results |
+| B1SCN | `GSTEST.DBS`, 100 frames: every game-scene feature in one small scene (a lit model with a distant level of detail, a banked track, an orbit, spinning and animated models, a decal, blended, additive and glowing quads, scrolling, warping, ramping and flickering surfaces, smoke, sparks and a shockwave, sky, fog, and a camera shot of each kind) | the scene runtime draws the same through both APIs and on every card |
 
 ## Synthetic (group `synth`)
 
