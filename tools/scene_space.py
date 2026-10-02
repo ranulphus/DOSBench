@@ -30,29 +30,6 @@ def light_for(fwd=(0, 0, 1), up=(0, 1, 0)):
     return ((G.dot(SUN, left), G.dot(SUN, up), G.dot(SUN, fwd)), SUN_RGB, AMBIENT)
 
 
-def noise3(p, seed):
-    """Smooth 3D value noise in [-1, 1] (rock shapes)."""
-    def h(x, y, z):
-        return T.hash3(x * 73856093 + z * 19349663, y, seed) / 2147483647.5 - 1
-    xi, yi, zi = (int(math.floor(c)) for c in p)
-    f = [c - math.floor(c) for c in p]
-    f = [t * t * (3 - 2 * t) for t in f]
-    acc = 0.0
-    for dx in (0, 1):
-        for dy in (0, 1):
-            for dz in (0, 1):
-                w = (f[0] if dx else 1 - f[0]) * (f[1] if dy else 1 - f[1]) * (f[2] if dz else 1 - f[2])
-                acc += w * h(xi + dx, yi + dy, zi + dz)
-    return acc
-
-
-def rock_mesh(subdiv, seed):
-    m = M.icosphere(1.0, subdiv)
-    M.displace(m, lambda p: 0.28 * noise3(G.mul(p, 1.6), seed) + 0.12 * noise3(G.mul(p, 3.7), seed + 1))
-    m.map_uv(lambda p, uv: (p[0] * 0.45 + p[2] * 0.3, p[1] * 0.5 + p[2] * 0.2))
-    return m
-
-
 def fighter_mesh(col):
     parts = [M.box(2.0, 1.6, 9.0, uvs=2.0), M.wedge(2.0, 1.6, 3.0).transform(move=(0, -0.1, 6.0)),
              M.box(1.2, 0.8, 2.2, uvs=1.0).transform(move=(0, 1.1, 1.5)),
@@ -214,9 +191,9 @@ def build(args=None):
     for shape in range(6):
         entry = []
         for near, far in ((650.0, 1500.0), (320.0, 850.0)):
-            lo = G.add_model(s, [(rock_mesh(0, 40 + shape), t_rock, 0)], lit=True)
-            mid = G.add_model(s, [(rock_mesh(1, 40 + shape), t_rock, 0)], lit=True, lod_next=lo, lod_dist=far)
-            hi = G.add_model(s, [(rock_mesh(2, 40 + shape), t_rock, 0)], lit=True, lod_next=mid, lod_dist=near)
+            lo = G.add_model(s, [(M.rock(0, 40 + shape), t_rock, 0)], lit=True)
+            mid = G.add_model(s, [(M.rock(1, 40 + shape), t_rock, 0)], lit=True, lod_next=lo, lod_dist=far)
+            hi = G.add_model(s, [(M.rock(2, 40 + shape), t_rock, 0)], lit=True, lod_next=mid, lod_dist=near)
             entry.append(hi)
         rocks.append(entry)
     s.surfaces.append(dict(batch=s.models[m_beacon]["batch0"], kind=dbs.SK_PULSE, p=(0.15, 0.85, 0.8, 0)))

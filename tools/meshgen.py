@@ -5,7 +5,7 @@ Counter-clockwise triangles face outwards. Models face +z with +y up
 """
 import math
 
-from gsgen import add, cross, mul, norm, sub
+from gsgen import add, cross, mul, noise3, norm, sub
 
 
 class Mesh:
@@ -179,6 +179,13 @@ def icosphere(r, subdiv=1, col=(255, 255, 255)):
     for v in vs:
         m.vert(mul(v, r), v, (0.5 + math.atan2(v[2], v[0]) / (2 * math.pi), 0.5 - math.asin(v[1]) / math.pi), col)
     m.tris = list(fs)                               # counter-clockwise from outside
+    return m
+
+
+def rock(subdiv, seed):
+    m = icosphere(1.0, subdiv)
+    displace(m, lambda p: 0.28 * noise3(mul(p, 1.6), seed) + 0.12 * noise3(mul(p, 3.7), seed + 1))
+    m.map_uv(lambda p, uv: (p[0] * 0.45 + p[2] * 0.3, p[1] * 0.5 + p[2] * 0.2))
     return m
 
 

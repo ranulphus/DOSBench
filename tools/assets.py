@@ -87,6 +87,8 @@ SCENES = {
     "ARENA": ("game", "scene_arena:build", ["lite.zip"], "LibreQuake v0.09-beta (lite), the LibreQuake project: "
               "map lq_e0m1, soldier, dog, launcher and rocket models", "BSD-3-Clause",
               "Arena: LibreQuake e0m1 as a game"),
+    "CANYON": ("game", "scene_canyon:build", [], "DOSBench (procedural)", CC0,
+               "Canyon race: six buggies in a sandstone canyon"),
     "SPACE": ("game", "scene_space:build", [], "DOSBench (procedural)", CC0,
               "Space battle: a station, a cruiser, fighters and an asteroid field"),
 }

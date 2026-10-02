@@ -192,6 +192,27 @@ def track_point(tr, d, lateral=0.0, height=0.0):
     return add(pos, add(mul(left, lateral), mul(up, height)))
 
 
+def noise3(p, seed):
+    """Smooth 3D value noise in [-1, 1] (rock shapes)."""
+    def h(x, y, z):
+        return _hash3(x * 73856093 + z * 19349663, y, seed) / 2147483647.5 - 1
+    xi, yi, zi = (int(math.floor(c)) for c in p)
+    f = [c - math.floor(c) for c in p]
+    f = [t * t * (3 - 2 * t) for t in f]
+    acc = 0.0
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                w = (f[0] if dx else 1 - f[0]) * (f[1] if dy else 1 - f[1]) * (f[2] if dz else 1 - f[2])
+                acc += w * h(xi + dx, yi + dy, zi + dz)
+    return acc
+
+
+def _hash3(x, y, seed):
+    import texgen
+    return texgen.hash3(x, y, seed)
+
+
 def budget(s, name, tris=None):
     """Print what the scene holds: geometry, models, instances, textures at 16 bits."""
     print("%s: %d triangles in %d batches, %d models, %d instances, %d particle kinds, %d emitters, %d bursts, "

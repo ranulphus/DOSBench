@@ -1,7 +1,8 @@
 {
  "_about": "Frame-check tolerances for tools/run.py (MGA-Glide's tools/imgcmp.py options: tol per channel after RGB565 quantisation, frac of pixels allowed beyond it, edge ignores colour edges of the reference). Per kind, then per test.",
  "default": {"tol": 24, "frac": 0.005, "edge": true},
- "glide-vs-voodoo": {"default": {}},
+ "glide-vs-voodoo": {"default": {},
+   "G2RACE": {"tol": 64, "frac": 0.02, "_why": "the canyon's long walls and road at grazing angles: MGA-Glide chooses a mip level per triangle, the Voodoo per pixel, so the striped and noisy textures blur differently (about 1% of pixels beyond 64 levels, almost none beyond 100)"}},
  "gl-across-cards": {"default": {}},
  "glide-across-cards": {"default": {}},
  "gl-vs-glide": {"default": {"advisory": true}},
@@ -15,7 +16,8 @@
      "S1BLND": {"box": true, "_why": "the G100 blends by stipple (MGA-Glide D8, DOS-GL likewise): compared through a 4x4 box filter, as in MGA-Glide's conformance manifest"},
      "L1LQ2P": {"advisory": true, "_why": "the second pass multiplies by the destination, which the G100 cannot do: MGA-Glide skips it (D8), DOS-GL supports the G100 for development only"},
      "G1ARNA": {"advisory": true, "_why": "two-pass lightmaps as L1LQ2P; the smoke and the sky's front layer are stippled"},
-     "B1SCN": {"advisory": true, "_why": "the runtime's check scene is mostly blended and additive quads and particles, which the G100 stipples"}
+     "B1SCN": {"advisory": true, "_why": "the runtime's check scene is mostly blended and additive quads and particles, which the G100 stipples"},
+     "G2RACE": {"advisory": true, "_why": "the dust is blended, which the G100 stipples"}
    }
  }
 }
