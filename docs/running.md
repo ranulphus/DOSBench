@@ -70,7 +70,12 @@ or 3dfx's on a Voodoo), `CWSDPMI.EXE`, `DOS4GW.EXE` (or have them on PATH)
 and `build/data/*` as `DATA\`. Then `DOSBENCH`:
 
 - choose the APIs, modes, vsync, the OpenGL submission path, seconds per
-  test, frame saving and the tests (Space toggles, A all, N none);
+  test, frame saving and the tests: a preset (Space on the Tests row: Full,
+  the scenes, models and feature tests; Scenes only, the scored part, a good
+  demonstration; Features only), or test by test under their groups and
+  suites (Space toggles a test, or everything under a heading; A all, N
+  none; any change makes the selection Custom). Full is the default; the
+  choice is kept in `DBMENU.CFG`;
 - R runs them: the menu writes `TESTS.LST` and `RUNSEL.BAT` and exits, the
   batch file runs each program on its own (all with one `--session` id),
   then shows the results screen for that run and returns to the menu;
@@ -132,12 +137,19 @@ frame checks, with MGA-Glide's `tools/imgcmp.py` (tolerances in
 
 `checks.json`'s `cards` section relaxes single tests on one card, for what
 that card cannot draw the same way: on the G100, S1BLND (stipple blending)
-is compared through a 4x4 box filter and L1LQ2P (a pass that multiplies by
-the destination) is advisory.
+is compared through a 4x4 box filter and L1LQ2P and G1ARNA (passes that
+multiply by the destination) are advisory. A game scene saves one frame, its
+GHDR capture frame, chosen by its generator away from thick smoke and fire:
+blended particles are where a Voodoo's dithered 16-bit blending and a
+Matrox card's rightly differ. `--shot-frames F,...` saves more frames of
+camera-path tests for a review (they are compared too).
 
-After the programs, the job runs `DBMENU --dump` for the job's session and
-checks that the results screen shows the same scores and figures that
-`tools/report.py` reads from `RESULTS.TXT` (a failure fails the run).
+After the programs, the job checks the records: per program and mode, one T
+line for every selected test (Glide's say skip for the OpenGL-only ones), an
+S line when a scored scene was selected, with a score when every scene ran.
+It then runs `DBMENU --dump` for the job's session and checks that the
+results screen shows the same scores and figures that `tools/report.py`
+reads from `RESULTS.TXT`. Either failing fails the run.
 
 Output: `out/loopa/<card>/` (`serial.log`, `files/RESULTS.TXT`,
 `files/SUMMARY.TXT`, `*.png`, `diff/`, `programs.json`, `checks.json`).

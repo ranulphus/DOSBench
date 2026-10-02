@@ -328,6 +328,45 @@ def check_summary(out):
     return probs
 
 
+def check_records(out, sel):
+    """RESULTS.TXT against the selection: per program and mode, one T line for every
+    selected test and none other (Glide's say skip for the OpenGL-only ones); an S line
+    when a scored scene was selected, with a score when every scene ran. Problems as text."""
+    import report
+    res = os.path.join(out, "files", "RESULTS.TXT")
+    if not os.path.exists(res):
+        return ["no RESULTS.TXT"]
+    recs = report.read_results(res, warn=lambda m: None)
+    want = registry.select(sel)
+    scored = [t for t in want if registry.entry(t)["weight"] > 0]
+    probs = []
+    for tag, mode in sorted({(r.get("tag"), r.get("mode")) for r in recs}):
+        mine = [r for r in recs if r.get("tag") == tag and r.get("mode") == mode]
+        glide = any(r.get("api") == "glide" for r in mine)
+        got = [r["test"] for r in mine if r.get("rec") != "score"]
+        for t in want:
+            if got.count(t) != 1:
+                probs.append("%s %s: %d T lines for %s" % (tag, mode, got.count(t), t))
+        for t in sorted(set(got) - set(want)):
+            probs.append("%s %s: T line for %s, not selected" % (tag, mode, t))
+        for r in mine:                              # Glide says skip for the OpenGL-only tests
+            if glide and r.get("test") and registry.entry(r["test"]) and registry.entry(r["test"])["gl_only"] \
+                    and r.get("status") != "skip":
+                probs.append("%s %s: %s is OpenGL only, status %s" % (tag, mode, r["test"], r.get("status")))
+        sl = [r for r in mine if r.get("rec") == "score"]
+        if bool(scored) != bool(sl) or len(sl) > 1:
+            probs.append("%s %s: %d S lines for %d scored scenes" % (tag, mode, len(sl), len(scored)))
+        elif sl:                                    # a score needs every scored scene, from this run
+            every = set(registry.scored()) <= set(scored) and \
+                all(r.get("status") == "ok" for r in mine if r.get("test") in scored)
+            st = sl[0].get("status")
+            if every and (st not in ("ok", "quick") or not sl[0].get("score")):
+                probs.append("%s %s: every scene ran but the S line says %s" % (tag, mode, st))
+            if not every and (st in ("ok", "quick") or sl[0].get("score")):
+                probs.append("%s %s: a scene is missing but the S line says %s" % (tag, mode, st))
+    return probs
+
+
 def fill_glide_display(out):
     """Glide cannot tell BENCHG how MGA-Glide shows a size: take it from the
     runtime's MGL-WINOPEN lines (display=WxH fit=F), in order, into the H
@@ -374,7 +413,12 @@ def cmd_loopa(a):
             print("  results screen: %s" % p)
         if not probs:
             print("  results screen: agrees with report.py")
-        all_ok = all_ok and not probs
+        recs = check_records(out, a.tests)
+        for p in recs:
+            print("  records: %s" % p)
+        if not recs:
+            print("  records: a T line per selected test; S lines as selected")
+        all_ok = all_ok and not probs and not recs
     all_ok = report_checks(dirs) and all_ok
     print("loopa: %s" % ("PASS" if all_ok else "FAIL"))
     return 0 if all_ok else 1
@@ -657,7 +701,10 @@ def cmd_bench(a):
 
 WINVM_NOTES = """What is on C:
   C:\\DOSBENCH   DOSBench. Type DOSBENCH for the menu (it starts in this directory):
-                pick APIs, modes and tests, R runs them, V shows the results.
+                pick APIs, modes and tests (the Full preset: the four game scenes,
+                the models, the feature tests; Scenes only is the scored part
+                and the best to watch), R runs them and ends on this run's
+                results with the DOSBench score, V shows all results.
                 BENCHGL.EXE is OpenGL on DOS-GL, BENCHG.EXE Glide on MGA-Glide's
                 GLIDE2X.OVL (this directory). The scenes are in DATA; see
                 DATA\\CREDITS.TXT (the Stanford scans are for research use: this is

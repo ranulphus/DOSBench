@@ -1,11 +1,13 @@
 /* menu.c - DBMENU.EXE, DOSBench's text-mode front end (DJGPP, conio).
  *
- * Pick the APIs, modes, options and tests, then run: the menu writes
- * TESTS.LST, RUN.ARG and RUNSEL.BAT and exits with code 2, and DOSBENCH.BAT runs
- * RUNSEL.BAT (each benchmark program on its own, with nothing resident
- * from the menu) and restarts the menu. "Results" reads OUT\RESULTS.TXT and
- * shows the latest figures per test and program. Selections are kept in
- * DBMENU.CFG. Paths are relative to the DOSBench directory. */
+ * Pick the APIs, modes, options and tests (a preset, or test by test under
+ * their groups and suites), then run: the menu writes TESTS.LST, RUN.ARG and
+ * RUNSEL.BAT and exits with code 2, and DOSBENCH.BAT runs RUNSEL.BAT (each
+ * benchmark program on its own, with nothing resident from the menu), which
+ * ends on this run's results screen and restarts the menu. "Results" reads
+ * OUT\RESULTS.TXT and shows the latest figures per test and program.
+ * Selections are kept in DBMENU.CFG. Paths are relative to the DOSBench
+ * directory. */
 #include <conio.h>
 #include <stdarg.h>
 #include <pc.h>
@@ -13,14 +15,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "version.h"
 
-typedef struct { const char *id, *group, *what; int gl_only; const char *metric, *unit; } menu_test;
+typedef struct { const char *id, *group, *what; int gl_only; const char *metric, *unit, *parent, *title; } menu_test;
 /* The test catalogue: the registry (src/core/tests.json), in run order. */
 static const menu_test menu_tests[] = {
 #define DB_TEST(id, group, parent, impl, param, file, flags, metric, unit, weight, secs, derive, title, what) \
-    { id, group, what, (flags) & 1, metric, unit },
+    { id, group, what, (flags) & 1, metric, unit, parent, title },
 #include "registry.h"
-    { 0, 0, 0, 0, 0, 0 }
+    { 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+static const char *const menu_presets[][3] = {       /* id, title, tests */
+#define DB_PRESET(id, title, tests) { id, title, tests },
+#include "registry.h"
+    { 0, 0, 0 }
 };
 
 #define MAX_TESTS 96
@@ -37,6 +45,8 @@ static const char *const mode_names[NMODES] = { "320x200", "320x240", "400x300",
 static int opt[O_COUNT] = { 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };   /* GL, Glide, 640x480, auto */
 static int sel[MAX_TESTS];
 static int ntests;
+static int preset;                      /* a row of menu_presets, or -1: Custom */
+static int npresets;
 
 enum { A_TITLE = 0x1F, A_TEXT = 0x07, A_DIM = 0x08, A_HEAD = 0x0E, A_CUR = 0x70, A_KEY = 0x0B };
 
@@ -63,13 +73,41 @@ static void line(int y, int attr, const char *fmt, ...)
 }
 
 /* ---- Settings ---------------------------------------------------------- */
+/* Whether test t is in a --tests style list (groups, suites, ids, prefixes; select.c's rules). */
+static int in_list(const menu_test *t, const char *list)
+{
+    char tok[24];
+    const char *p = list;
+    while (*p) {
+        size_t n = strcspn(p, ", ");
+        if (n && n < sizeof tok) {
+            memcpy(tok, p, n);
+            tok[n] = 0;
+            if (!strcmp(tok, "all") || !strcmp(tok, t->group) || !strcmp(tok, t->id) || !strcmp(tok, t->parent) ||
+                (n <= 3 && !strncmp(t->id, tok, n)))
+                return 1;
+        }
+        p += n;
+        while (*p == ',' || *p == ' ')
+            p++;
+    }
+    return 0;
+}
+
+static void apply_preset(int k)
+{
+    int i;
+    preset = k;
+    for (i = 0; i < ntests; i++)
+        sel[i] = in_list(&menu_tests[i], menu_presets[k][2]);
+}
+
 static void load_cfg(void)
 {
     FILE *f = fopen("DBMENU.CFG", "r");
     char buf[1024];
     int i;
-    for (i = 0; i < ntests; i++)
-        sel[i] = 1;
+    apply_preset(0);                    /* the first preset: Full */
     if (!f)
         return;
     while (fgets(buf, sizeof buf, f)) {
@@ -81,12 +119,17 @@ static void load_cfg(void)
         if (!strcmp(buf, "OPT")) {
             for (i = 0; i < O_COUNT && v[i]; i++)
                 opt[i] = v[i] - '0';
-        } else if (!strcmp(buf, "TESTS")) {
+        } else if (!strcmp(buf, "TESTS") && preset < 0) {
             for (i = 0; i < ntests; i++) {
                 const char *p = strstr(v, menu_tests[i].id);
                 size_t n = strlen(menu_tests[i].id);
                 sel[i] = p && (p == v || p[-1] == ',') && (p[n] == ',' || p[n] == 0);
             }
+        } else if (!strcmp(buf, "PRESET")) {        /* before TESTS in the file; Custom keeps the list */
+            preset = -1;
+            for (i = 0; i < npresets; i++)
+                if (!strcmp(v, menu_presets[i][0]))
+                    apply_preset(i);
         }
     }
     fclose(f);
@@ -101,6 +144,7 @@ static void save_cfg(void)
     fprintf(f, "OPT=");
     for (i = 0; i < O_COUNT; i++)
         fputc('0' + opt[i], f);
+    fprintf(f, "\nPRESET=%s", preset >= 0 ? menu_presets[preset][0] : "custom");
     fprintf(f, "\nTESTS=");
     for (i = 0; i < ntests; i++)
         if (sel[i])
@@ -110,11 +154,59 @@ static void save_cfg(void)
 }
 
 /* ---- Main screen ------------------------------------------------------- */
-static int rows(void) { return O_COUNT + 1 + ntests; }
+/* After the options: the preset row, then the tests in run order under their
+ * group's heading, a suite's phases under the suite's. */
+enum { R_OPT, R_PRESET, R_GROUP, R_SUITE, R_TEST };
+typedef struct { int kind, index; const char *key; } menu_row;
+static menu_row tree[MAX_TESTS * 3 + O_COUNT + 2];
+static int ntree;
 
-static void row_text(int r, char *buf, size_t n)
+static const char *group_title(const char *g);
+static const char *suite_title(const char *s);
+
+static void build_tree(void)
 {
-    if (r < O_COUNT) {
+    const char *group = "", *suite = "";
+    int i;
+    ntree = 0;
+    for (i = 0; i < O_COUNT; i++)
+        tree[ntree++] = (menu_row){ R_OPT, i, 0 };
+    tree[ntree++] = (menu_row){ R_PRESET, 0, 0 };
+    for (i = 0; i < ntests; i++) {
+        const menu_test *t = &menu_tests[i];
+        if (strcmp(t->group, group)) {
+            group = t->group;
+            suite = "";
+            tree[ntree++] = (menu_row){ R_GROUP, i, t->group };
+        }
+        if (t->parent[0] && strcmp(t->parent, suite)) {
+            suite = t->parent;
+            tree[ntree++] = (menu_row){ R_SUITE, i, t->parent };
+        }
+        tree[ntree++] = (menu_row){ R_TEST, i, 0 };
+    }
+}
+
+static int rows(void) { return ntree; }
+
+/* Whether every test under a heading is selected. */
+static int all_under(const menu_row *r)
+{
+    int i, any = 0;
+    for (i = 0; i < ntests; i++)
+        if (!strcmp(r->kind == R_GROUP ? menu_tests[i].group : menu_tests[i].parent, r->key)) {
+            if (!sel[i])
+                return 0;
+            any = 1;
+        }
+    return any;
+}
+
+static void row_text(int ri, char *buf, size_t n)
+{
+    const menu_row *row = &tree[ri];
+    int r = row->index;
+    if (row->kind == R_OPT) {
         switch (r) {
         case O_GL: snprintf(buf, n, " [%c] OpenGL on DOS-GL        (BENCHGL.EXE)", opt[r] ? 'x' : ' '); break;
         case O_GLIDE: snprintf(buf, n, " [%c] Glide via GLIDE2X.OVL   (BENCHG.EXE)", opt[r] ? 'x' : ' '); break;
@@ -132,11 +224,32 @@ static void row_text(int r, char *buf, size_t n)
             break;
         default: snprintf(buf, n, "     Save a frame per test: %s", opt[r] ? "yes (OUT\\*.PPM)" : "no"); break;
         }
-    } else if (r == O_COUNT) {
-        snprintf(buf, n, " Tests");
+    } else if (row->kind == R_PRESET) {
+        if (preset >= 0) {                  /* the preset's groups by their titles */
+            char what[72] = "", tok[24];
+            const char *p = menu_presets[preset][2];
+            while (*p) {
+                size_t k = strcspn(p, ", ");
+                if (k && k < sizeof tok) {
+                    memcpy(tok, p, k);
+                    tok[k] = 0;
+                    snprintf(what + strlen(what), sizeof what - strlen(what), "%s%s", what[0] ? ", " : "",
+                             group_title(tok));
+                }
+                p += k;
+                while (*p == ',' || *p == ' ')
+                    p++;
+            }
+            snprintf(buf, n, " Tests: %s: %s   (Space: another preset)", menu_presets[preset][1], what);
+        } else
+            snprintf(buf, n, " Tests: Custom   (Space: a preset)");
+    } else if (row->kind == R_GROUP) {
+        snprintf(buf, n, " [%c] %s", all_under(row) ? 'x' : ' ', group_title(row->key));
+    } else if (row->kind == R_SUITE) {
+        snprintf(buf, n, "   [%c] %s", all_under(row) ? 'x' : ' ', suite_title(row->key));
     } else {
-        const menu_test *t = &menu_tests[r - O_COUNT - 1];
-        snprintf(buf, n, " [%c] %-7s %-6s %s%s", sel[r - O_COUNT - 1] ? 'x' : ' ', t->id, t->group, t->what,
+        const menu_test *t = &menu_tests[r];
+        snprintf(buf, n, "%s[%c] %-7s %s%s", t->parent[0] ? "       " : "     ", sel[r] ? 'x' : ' ', t->id, t->title,
                  t->gl_only ? " (OpenGL only)" : "");
     }
 }
@@ -145,7 +258,7 @@ static void draw_main(int cur, int top)
 {
     int i;
     char buf[100];
-    line(1, A_TITLE, " DOSBench " "0.1" " - Glide 2.x and OpenGL 1.1 benchmark for DOS");
+    line(1, A_TITLE, " DOSBench " DB_VERSION " - Glide 2.x and OpenGL 1.1 benchmark for DOS");
     line(2, A_TEXT, "");
     for (i = 0; i < LIST_ROWS; i++) {
         int r = top + i;
@@ -154,7 +267,8 @@ static void draw_main(int cur, int top)
             continue;
         }
         row_text(r, buf, sizeof buf);
-        line(LIST_TOP + i, r == cur ? A_CUR : r == O_COUNT ? A_HEAD : A_TEXT, "%s", buf);
+        line(LIST_TOP + i, r == cur ? A_CUR : tree[r].kind == R_PRESET || tree[r].kind == R_GROUP ? A_HEAD : A_TEXT,
+             "%s", buf);
     }
     line(22, A_TEXT, "");
     line(23, A_KEY, " Up/Down PgUp/PgDn move   Space toggle   A all tests   N no tests");
@@ -162,17 +276,32 @@ static void draw_main(int cur, int top)
     gotoxy(1, 25);
 }
 
-static void toggle(int r)
+static void toggle(int ri)
 {
-    if (r < O_COUNT) {
+    const menu_row *row = &tree[ri];
+    int r = row->index, i;
+    if (row->kind == R_PRESET) {
+        apply_preset(preset + 1 < npresets ? preset + 1 : 0);
+        return;
+    }
+    if (row->kind == R_GROUP || row->kind == R_SUITE) {   /* all of it on, or all off */
+        int on = !all_under(row);
+        for (i = 0; i < ntests; i++)
+            if (!strcmp(row->kind == R_GROUP ? menu_tests[i].group : menu_tests[i].parent, row->key))
+                sel[i] = on;
+        preset = -1;
+        return;
+    }
+    if (row->kind == R_OPT) {
         if (r == O_SUBMIT)
             opt[r] = (opt[r] + 1) % 3;
         else if (r == O_SECS)
             opt[r] = (opt[r] + 1) % (int)(sizeof secs_values / sizeof secs_values[0]);
         else
             opt[r] = !opt[r];
-    } else if (r > O_COUNT) {
-        sel[r - O_COUNT - 1] = !sel[r - O_COUNT - 1];
+    } else {
+        sel[r] = !sel[r];
+        preset = -1;
     }
 }
 
@@ -262,6 +391,24 @@ static const char *const menu_groups[][2] = {
 #include "registry.h"
     { 0, 0 }
 };
+
+static const char *group_title(const char *g)
+{
+    int k;
+    for (k = 0; menu_groups[k][0]; k++)
+        if (!strcmp(menu_groups[k][0], g))
+            return menu_groups[k][1];
+    return g;
+}
+
+static const char *suite_title(const char *s)
+{
+    int k;
+    for (k = 0; menu_suites[k].id; k++)
+        if (!strcmp(menu_suites[k].id, s))
+            return menu_suites[k].title;
+    return s;
+}
 
 /* The T-line key a test is judged by, from the registry; NULL for frame rates. */
 static const char *metric_key(const char *test, const char **unit)
@@ -595,6 +742,9 @@ int main(int argc, char **argv)
     int results = 0;
     for (ntests = 0; menu_tests[ntests].id && ntests < MAX_TESTS; ntests++)
         ;
+    for (npresets = 0; menu_presets[npresets][0]; npresets++)
+        ;
+    build_tree();
     /* --results [--session ID]: the results screen (after a run: the last
      * session); --dump FILE: the same as text, without the screen (Loop A). */
     for (i = 1; i < argc; i++) {
@@ -646,8 +796,8 @@ int main(int argc, char **argv)
         }
         switch (ch) {
         case ' ': case 13: toggle(cur); break;
-        case 'a': case 'A': for (i = 0; i < ntests; i++) sel[i] = 1; break;
-        case 'n': case 'N': for (i = 0; i < ntests; i++) sel[i] = 0; break;
+        case 'a': case 'A': for (i = 0; i < ntests; i++) sel[i] = 1; preset = -1; break;
+        case 'n': case 'N': for (i = 0; i < ntests; i++) sel[i] = 0; preset = -1; break;
         case 'v': case 'V': clrscr(); show_results(NULL); clrscr(); break;
         case 'r': case 'R':
             save_cfg();
