@@ -22,6 +22,7 @@
   {"id": "G1ARNA", "group": "scene", "impl": "scene", "file": "ARENA.DBS", "weight": 1, "budget": {"tris": 10000}, "title": "Arena", "what": "LibreQuake's e0m1 as a game: two-pass lightmaps, a scrolling sky, rockets, soldiers and dogs animated and lit on the CPU, explosions"},
   {"id": "G2RACE", "group": "scene", "impl": "scene", "file": "CANYON.DBS", "weight": 1, "budget": {"tris": 8000}, "title": "Canyon race", "what": "six buggies round a banked dirt loop in a sandstone canyon: geometry, haze, dust thrown up close to the camera"},
   {"id": "G3SPAC", "group": "scene", "impl": "scene", "file": "SPACE.DBS", "weight": 1, "budget": {"tris": 10000}, "title": "Space battle", "what": "a station, a cruiser, two fighter squadrons and an asteroid field: many objects, each moved and lit on the CPU; lasers and explosions"},
+  {"id": "G4CITY", "group": "scene", "impl": "scene", "file": "CITY.DBS", "weight": 1, "budget": {"tris": 10000}, "title": "City at dusk", "what": "a city's windows lighting up one by one as night falls: facades drawn twice, 300 cars with lights, a helicopter's searchlight"},
 
   {"id": "GALLERY", "group": "model", "suite": true, "title": "Model gallery", "what": "static meshes from 0.7k to 69k triangles, orbited, textured and lit"},
   {"id": "M1TP4K", "parent": "GALLERY", "impl": "model", "file": "TPOT4K.DBS", "title": "Utah teapot, 4.5k triangles", "what": "Utah teapot, 4.5k triangles, Gouraud"},

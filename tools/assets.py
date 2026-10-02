@@ -89,6 +89,8 @@ SCENES = {
               "Arena: LibreQuake e0m1 as a game"),
     "CANYON": ("game", "scene_canyon:build", [], "DOSBench (procedural)", CC0,
                "Canyon race: six buggies in a sandstone canyon"),
+    "CITY": ("game", "scene_city:build", [], "DOSBench (procedural)", CC0,
+             "City at dusk: windows lighting up, traffic, a helicopter"),
     "SPACE": ("game", "scene_space:build", [], "DOSBench (procedural)", CC0,
               "Space battle: a station, a cruiser, fighters and an asteroid field"),
 }

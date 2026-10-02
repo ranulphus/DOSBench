@@ -15,6 +15,7 @@ writes `build/data/*.DBS` and `build/data/CREDITS.TXT`.
 | LQE0M1 | LibreQuake v0.09-beta `lite.zip`, `pak0.pak`: `maps/lq_e0m1.bsp` and `gfx/palette.lmp` | BSD-3-Clause (maps, textures; the release's `docs/COPYING`) |
 | ARENA | LibreQuake v0.09-beta `lite.zip`: `maps/lq_e0m1.bsp` (the LQE0M1 world, with the sky's front layer), `progs/soldier.mdl`, `dog.mdl`, `v_rock.mdl`, `missile.mdl`; the rest procedural (`tools/scene_arena.py`, `quakemdl.py`) | BSD-3-Clause (LibreQuake's models, textures and maps; its QuakeC is GPL-2 and not used) |
 | CANYON | procedural: `tools/scene_canyon.py` (nothing fetched) | CC0-1.0 |
+| CITY | procedural: `tools/scene_city.py` (nothing fetched) | CC0-1.0 |
 | SPACE | procedural: `tools/scene_space.py` with `gsgen.py`, `meshgen.py`, `texgen.py` (PCG32 seeds; nothing fetched) | CC0-1.0 |
 | GSTEST | procedural: `tools/dbs.py` (`selftest2_scene`), the scene runtime's check | CC0-1.0 |
 
