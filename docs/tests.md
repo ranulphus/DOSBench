@@ -135,6 +135,7 @@ draws the same frames. The catalogue is `tools/games.json`.
 | HLD1V | HLD1 on Xash3D's VBO path (`gl_vbo 1`): world lightmaps in the second texture unit, one pass (G400/G450: DOS-GL's buffer objects and combine) | HLD1 |
 | HLD2V | HLD2 on the VBO path | HLD2 |
 | FW1 | Fifth Wheel (`FIFTHWHEEL`: its game and the dgk kit on DOS-GL): 3,000 frames of the autopilot touring its generated 4 x 4 km world, one tick per frame, vsync off; no retail data, the files go on C: | the first card |
+| FW1L, FW1H | FW1 at Fifth Wheel's LOW detail preset, and at HIGH with the camera pulled right back (`-detail`, `-zoom 2`); `BUDGET.CFG` (the presets' numbers) goes beside the game | none: they bracket FW1 for the presets' tuning |
 | FWP | Fifth Wheel's performance probe: one record per case, `FWP-<tris>-arr`/`-list`/`-imm` (1,000-8,000 triangles through vertex arrays, display lists, immediate mode), `-arr-tex` (textured), `FWP-2000-d<draws>` (50-400 draw calls), and an `FWP` summary; the game writes them itself (`dgk/bench.h`) | none: the records feed Fifth Wheel's budget model (its `docs/perf.md`) |
 | PBD1 | PrBoom-plus (DOS-GL's `tools/doom`: the fork on SDL3 and DOS-GL) Doom II `demo1` (MAP11) on the OpenGL renderer: compatibility mode, the sky as a screen quad; the owner's IWADs, 640x480, no sound; the game writes its own H/T lines (`-dosbench`) | the first card |
 | PBD1S | the same demo on the software renderer (8-bit VESA mode: the CPU's work, GL idle) | the first card |

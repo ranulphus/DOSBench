@@ -529,8 +529,10 @@ def games_job(card, key, tests, a):
 def fw_job(card, tests, a):
     """Fifth Wheel's tests (FIFTHWHEEL: its game and the dgk kit on DOS-GL):
     no retail data, so everything goes on C:. FW1 times 3,000 frames of the
-    autopilot driving its generated world; FWP is the performance probe. The game writes its own H
-    and T lines (dgk/bench.h)."""
+    autopilot driving its generated world (FW1L at the LOW detail preset, FW1H
+    at HIGH with the camera pulled right back); FWP is the performance probe.
+    BUDGET.CFG, the presets' numbers, goes beside the game when the build has
+    one. The game writes its own H and T lines (dgk/bench.h)."""
     fw = VARS.get("FIFTHWHEEL", os.path.expanduser("~/FifthWheel"))
     q = rsp_dir = os.path.join(ROOT, "build", "games", "fifthwheel")
     os.makedirs(q, exist_ok=True)
@@ -541,6 +543,10 @@ def fw_job(card, tests, a):
         shutil.copyfile(src, os.path.join(q, name))
     out = os.path.join(ROOT, "out", "games", card, "fifthwheel")
     files = ["%s=/TEST/FWHEEL.EXE" % os.path.join(q, "FWHEEL.EXE"), "%s=/TEST/WORLD.PAK" % os.path.join(q, "WORLD.PAK")]
+    budget = os.path.join(fw, "build", "data", "budget.cfg")   # the detail presets' numbers (optional)
+    if os.path.exists(budget):
+        shutil.copyfile(budget, os.path.join(q, "BUDGET.CFG"))
+        files.append("%s=/TEST/BUDGET.CFG" % os.path.join(q, "BUDGET.CFG"))
     cmds = ["C:", "CD \\TEST"]
     for tid, t in tests.items():
         rsp = os.path.join(rsp_dir, tid + ".RSP")
