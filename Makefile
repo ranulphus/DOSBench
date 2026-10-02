@@ -91,10 +91,10 @@ build/gen/registry.h: tools/registry.py src/core/tests.json tools/games.json
 $(G_OBJS) $(L_OBJS): | build/gen/registry.h
 
 # The menu: no graphics, no shim; its test catalogue is the registry.
-build/dos/DBMENU.EXE: src/menu/menu.c build/gen/registry.h
+build/dos/DBMENU.EXE: src/menu/menu.c build/gen/registry.h src/core/version.h
 	@mkdir -p $(dir $@)
 	$(Q)echo "  DJLD    $@"
-	$(Q)$(DJCC) -std=gnu99 -O2 -march=i386 -Wall -Wextra -Werror -Ibuild/gen -o $@ $<
+	$(Q)$(DJCC) -std=gnu99 -O2 -march=i386 -Wall -Wextra -Werror -Ibuild/gen -Isrc/core -o $@ $<
 	@if [ -e "$(@:.EXE=.exe)" ] && ! [ "$(@:.EXE=.exe)" -ef "$@" ]; then rm -f "$(@:.EXE=.exe)"; fi
 
 # ---- Host unit tests ------------------------------------------------------
@@ -110,7 +110,7 @@ UNIT_scene := src/core/scene.c src/core/vmath.c
 UNIT_select := src/core/select.c src/core/registry.c
 build/host/test_select: build/gen/registry.h
 UNIT_score := src/core/score.c
-UNIT_gs    := src/core/gs.c src/core/gsfx.c src/core/scene.c src/core/vmath.c src/core/cull.c src/core/dbutil.c \
+UNIT_gs    := src/core/gs.c src/core/gsfx.c src/core/scene.c src/core/vmath.c src/core/cull.c src/core/dbutil.c src/core/lvworld.c src/core/bspvis.c \
               tests/host/rb_stub.c
 build/host/test_gs: build/host/selftest2.dbs
 .SECONDEXPANSION:
@@ -121,7 +121,7 @@ build/host/test_%: tests/unit/test_%.c tests/unit/unit.c tests/unit/unit.h $$(UN
 # scene test through a stub backend: hashes, triangles, draw calls, fill.
 REPLAY_SRCS := tests/host/screplay.c tests/host/rb_stub.c src/core/dbutil.c src/core/level.c src/core/model.c \
                src/core/scene.c src/core/vmath.c src/core/cull.c src/core/bspvis.c src/core/gs.c src/core/gsfx.c \
-               src/core/scenes.c
+               src/core/scenes.c src/core/lvworld.c
 build/host/screplay: $(REPLAY_SRCS) tests/host/rb_stub.h $(wildcard src/core/*.h src/backend/*.h) build/gen/registry.h
 	@mkdir -p $(dir $@)
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -Itests/host -o $@ $(REPLAY_SRCS) -lm

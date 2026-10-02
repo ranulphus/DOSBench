@@ -319,43 +319,48 @@ void gsfx_vertices(gs_world *w, int inst, int batch, const uint16_t *lut)
             }
         }
     }
-    if (w->surf[batch] >= 0) {
-        const sc_surf *s = &sc->surf[w->surf[batch]];
-        const float *p = s->p;
-        for (j = 0; j < b->vcount; j++) {
-            rb_vertex *x = &v[j];
-            float k = 1, u0 = x->u, v0 = x->v;
-            switch (s->kind) {
-            case SC_SK_SCROLL:
-                x->u += (float)fmod(p[0] * t, 1.0);
-                x->v += (float)fmod(p[1] * t, 1.0);
-                continue;
-            case SC_SK_WARP:
-                x->u = u0 + p[0] * (float)sin(p[1] * v0 + p[2] * t);
-                x->v = v0 + p[0] * (float)sin(p[1] * u0 + p[2] * t);
-                continue;
-            case SC_SK_RAMP: {
-                float fade = p[0] > 0 ? p[0] : 1e-3f;
-                k = (float)((t - x->u2) / fade);
-                k = k < 0 ? 0 : k > 1 ? 1 : k;
-                if (x->v2 > 0) {
-                    float off = (float)((x->v2 - t) / fade);
-                    k *= off < 0 ? 0 : off > 1 ? 1 : off;
-                }
-                x->c[3] = scale8(x->c[3], k);
-                break;
+    if (w->surf[batch] >= 0)
+        gsfx_surface(&sc->surf[w->surf[batch]], v, b->vcount, t, (uint32_t)batch);
+}
+
+/* A surface effect on n vertices at story time t (seed: the flicker's). */
+void gsfx_surface(const sc_surf *s, rb_vertex *v, uint32_t n, double t, uint32_t seed)
+{
+    const float *p = s->p;
+    uint32_t j;
+    for (j = 0; j < n; j++) {
+        rb_vertex *x = &v[j];
+        float k = 1, u0 = x->u, v0 = x->v;
+        switch (s->kind) {
+        case SC_SK_SCROLL:
+            x->u += (float)fmod(p[0] * t, 1.0);
+            x->v += (float)fmod(p[1] * t, 1.0);
+            continue;
+        case SC_SK_WARP:
+            x->u = u0 + p[0] * (float)sin(p[1] * v0 + p[2] * t);
+            x->v = v0 + p[0] * (float)sin(p[1] * u0 + p[2] * t);
+            continue;
+        case SC_SK_RAMP: {
+            float fade = p[0] > 0 ? p[0] : 1e-3f;
+            k = (float)((t - x->u2) / fade);
+            k = k < 0 ? 0 : k > 1 ? 1 : k;
+            if (x->v2 > 0) {
+                float off = (float)((x->v2 - t) / fade);
+                k *= off < 0 ? 0 : off > 1 ? 1 : off;
             }
-            default: {                          /* pulse */
-                double ph = p[2] * t + x->u2;
-                k = p[0] + p[1] * (p[3] != 0 ? flicker((uint32_t)batch, ph) : (float)sin(2 * VM_PI * ph));
-                if (k < 0)
-                    k = 0;
-                break;
-            }
-            }
-            x->c[0] = scale8(x->c[0], k);
-            x->c[1] = scale8(x->c[1], k);
-            x->c[2] = scale8(x->c[2], k);
+            x->c[3] = scale8(x->c[3], k);
+            break;
         }
+        default: {                          /* pulse */
+            double ph = p[2] * t + x->u2;
+            k = p[0] + p[1] * (p[3] != 0 ? flicker(seed, ph) : (float)sin(2 * VM_PI * ph));
+            if (k < 0)
+                k = 0;
+            break;
+        }
+        }
+        x->c[0] = scale8(x->c[0], k);
+        x->c[1] = scale8(x->c[1], k);
+        x->c[2] = scale8(x->c[2], k);
     }
 }

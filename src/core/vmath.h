@@ -24,6 +24,8 @@ void m4_rotate_axis(mat4 *m, const float axis[3], float deg);   /* m = m * R(axi
 void m4_ypr(mat4 *m, float yaw, float pitch, float roll);
 /* A model's placement: +z along fwd, +y towards up, scaled by s, at pos. */
 void m4_from_frame(mat4 *m, const float pos[3], const float fwd[3], const float up[3], float s);
+/* r = the inverse of m, a rotation and a translation (a view matrix). */
+void m4_rigid_inverse(mat4 *r, const mat4 *m);
 /* out = the transposed upper 3x3 of m times v (into a rotation's frame). */
 void m4_rot_inv(const mat4 *m, const float v[3], float out[3]);
 /* out = m * (v, 1) */

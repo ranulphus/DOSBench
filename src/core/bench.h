@@ -5,7 +5,7 @@
 #include "rb.h"
 #include "vmath.h"
 
-#define DB_VERSION "0.2"                /* 0.2: the registry, suites, cards, the score */
+#include "version.h"
 #ifndef DB_BUILD_ID
 #  define DB_BUILD_ID "unknown"
 #endif

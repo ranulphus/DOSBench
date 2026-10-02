@@ -143,6 +143,20 @@ void m4_from_frame(mat4 *mt, const float pos[3], const float fwd[3], const float
     M(3, 0) = pos[0]; M(3, 1) = pos[1]; M(3, 2) = pos[2];
 }
 
+void m4_rigid_inverse(mat4 *r, const mat4 *mt)
+{
+    const float *m = mt->m;
+    mat4 t;
+    int c, k;
+    m4_identity(&t);
+    for (c = 0; c < 3; c++)
+        for (k = 0; k < 3; k++)
+            t.m[c * 4 + k] = m[k * 4 + c];
+    for (k = 0; k < 3; k++)
+        t.m[12 + k] = -(t.m[k] * m[12] + t.m[4 + k] * m[13] + t.m[8 + k] * m[14]);
+    *r = t;
+}
+
 void m4_rot_inv(const mat4 *mt, const float v[3], float out[3])
 {
     const float *m = mt->m;

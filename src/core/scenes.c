@@ -11,6 +11,8 @@
 typedef struct {
     scene sc;
     gs_world w;
+    lv_world lv;
+    int has_lv;
 } game;
 
 /* The file's CRC-32, for the T line (which content was measured). */
@@ -46,9 +48,31 @@ static int scene_setup(tctx *t)
         snprintf(t->note, sizeof t->note, "why=%s", why);
         return -1;
     }
-    if (sc_upload(&G->sc, 1) < 0) {
+    if (G->sc.vis) {                    /* a Quake level: its world, two-pass lightmaps */
+        if (lv_init(&G->lv, &G->sc, 0, (G->sc.ghdr->flags & SC_GF_QSKY) != 0, &why) < 0) {
+            snprintf(t->note, sizeof t->note, "why=%s", why);
+            return -1;
+        }
+        G->lv.surf = G->w.surf;
+        G->w.lv = &G->lv;
+        G->has_lv = 1;
+    }
+    if (sc_upload(&G->sc, !G->has_lv) < 0) {
         strcpy(t->note, "why=upload-failed");
         return -1;
+    }
+    if (G->has_lv) {                    /* static meshes for the models only: the world is gathered */
+        int m, k;
+        for (m = 0; m < G->sc.nmodel; m++)
+            for (k = G->sc.model[m].batch0; k < G->sc.model[m].batch0 + G->sc.model[m].nbatch; k++) {
+                const sc_batch *b = &G->sc.batch[k];
+                if (!G->sc.mesh[k] && !G->w.cpu[k] &&
+                    !(G->sc.mesh[k] = rb_mesh_create(G->sc.vert + b->vfirst, (int)b->vcount, G->sc.idx + b->ifirst,
+                                                     (int)b->icount))) {
+                    strcpy(t->note, "why=upload-failed");
+                    return -1;
+                }
+            }
     }
     gs_prefetch(&G->w);
     t->frames = (int)G->sc.ghdr->frames;
@@ -68,6 +92,8 @@ static void scene_done(tctx *t)
 {
     game *G = (game *)t->p;
     if (G) {
+        if (G->has_lv)
+            lv_free(&G->lv);
         gs_free(&G->w);
         sc_free(&G->sc);
         free(G);

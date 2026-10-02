@@ -24,7 +24,7 @@ file stays version 1, byte for byte) adds, after BTCH, in this order (u32
 count first, records as in src/core/scene.h):
 
   NRML  u32 n (<= 256), f32 normals[n][3]; u32 nvert, u8 index per vertex
-  GHDR  frames, f32 rate (story frames/s), clear_rgb, flags (1 fog), f32
+  GHDR  frames, f32 rate (story frames/s), clear_rgb, flags (1 fog, 2 Quake sky), f32
         fovy znear zfar, fog_rgb, f32 fog_start fog_end, f32 sun[3]
         (towards it), sun_rgb[3], ambient[3], seed, sky model, capture frame
   MODL  32-byte models: u16 batch0 nbatch flags (1 lit: lit on the CPU
@@ -35,7 +35,7 @@ count first, records as in src/core/scene.h):
   TRAK  per track: u32 nkeys flags (1 closed), f32 length, then f32 (x, y,
         z, roll degrees) per key, keys evenly spaced along the track
   INST  80-byte instances: u16 model, u8 kind, u8 flags (1 face the way
-        it goes, 2 never culled), u16 parent track, u32 f0 f1 (there for
+        it goes, 2 never culled, 4 placed in view space), u16 parent track, u32 f0 f1 (there for
         f0 <= f < f1; f1 0: to the end), f32 p[12], f32 anim[4] (first
         frame, frames, frames/s, phase s). Kinds and p, with tau the
         instance's own time ((f - f0) / rate):
@@ -90,10 +90,10 @@ BATCH = struct.Struct("<4H4I6f")
 assert VERT.size == 32 and BATCH.size == 48
 
 # Version 2 records (src/core/scene.h).
-GF_FOG = 1
+GF_FOG, GF_QSKY = 1, 2
 MF_LIT, MF_ANIM = 1, 2
 IK_STATIC, IK_TRACK, IK_SPIN, IK_ORBIT = range(4)
-IF_FACE, IF_NOCULL = 1, 2
+IF_FACE, IF_NOCULL, IF_VIEW = 1, 2, 4
 PF_ADD, PF_FLAT, PF_ALPHATEST, PF_NOFOG = 1, 2, 4, 8
 EF_MOVE = 1
 CK_PATH, CK_CHASE, CK_FIXED, CK_MOUNT, CK_ORBIT = range(5)
@@ -301,7 +301,18 @@ class Scene:
         if self.texture_bytes16() > TEX_BUDGET:
             probs.append("textures need %d KB at 16 bits, over the %d KB TMU" %
                          (self.texture_bytes16() // 1024, TEX_BUDGET // 1024))
-        big = max([abs(c) for v in self.verts for c in v[7:11]] or [0])
+        # Generated models keep texture coordinates within UV_LIMIT; a converted Quake world
+        # (batches outside every model) keeps the map's own, which the fly-through draws everywhere.
+        in_model = set()
+        for m in self.models:
+            in_model.update(range(m["batch0"], m["batch0"] + m["nbatch"]))
+        if not self.models:
+            in_model = set(range(len(self.batches)))
+        def coords(b):                              # u2, v2 are a lightmap's only with one (ramps keep times there)
+            return slice(7, 11) if b["lm"] != NONE else slice(7, 9)
+        big = max([abs(c) for i in in_model for v in self.verts[self.batches[i]["vfirst"]:self.batches[i]["vfirst"] +
+                                                                  self.batches[i]["vcount"]]
+                   for c in v[coords(self.batches[i])]] or [0])
         if big > UV_LIMIT:
             probs.append("a texture coordinate reaches %.1f (limit %g)" % (big, UV_LIMIT))
         nb, nm, ni, nt = len(self.batches), len(self.models), len(self.instances), len(self.tracks)

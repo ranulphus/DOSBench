@@ -78,6 +78,22 @@ run, the frames match); performance numbers come from the bench (Loop B).
 `tools/report.py` keeps Loop A records apart and leaves them out unless
 asked.
 
+## The game scenes
+
+A game scene draws every frame of its story once, frame 0 to the last (1000
+frames, 900 for the City), at the story's own frame numbers: 25 story frames
+per second, whatever the card manages. Its frame rate is frames over the time
+they took. Each frame is a pure function of its number (camera, objects,
+animation, lighting and particles are all recomputed from it), so every card
+and both APIs draw exactly the same frames, a slow card draws the same story
+in slow motion rather than fewer of its frames, and `make scene-stats` can
+replay them on the host in any order. Everything a scene uses is set up and
+its textures downloaded before the warm-up: no timed frame loads or downloads
+anything (the T line's `tex_kb_frame` shows it). The scenes' lengths and
+density are set from the host replay's triangle and fill counts, and will be
+calibrated on the bench so each takes 30 to 45 seconds on a Pentium II 350
+with a G400; `scorever` changes when they do.
+
 ## The score
 
 The DOSBench score is 100 x the geometric mean of the game scenes' average

@@ -13,6 +13,7 @@ writes `build/data/*.DBS` and `build/data/CREDITS.TXT`.
 | SUZANNE | Suzanne by Norbert Nopper (UX3D), Khronos glTF Sample Assets | CC0-1.0 |
 | AVOCADO | Avocado (Microsoft), Khronos glTF Sample Assets | CC0-1.0 |
 | LQE0M1 | LibreQuake v0.09-beta `lite.zip`, `pak0.pak`: `maps/lq_e0m1.bsp` and `gfx/palette.lmp` | BSD-3-Clause (maps, textures; the release's `docs/COPYING`) |
+| ARENA | LibreQuake v0.09-beta `lite.zip`: `maps/lq_e0m1.bsp` (the LQE0M1 world, with the sky's front layer), `progs/soldier.mdl`, `dog.mdl`, `v_rock.mdl`, `missile.mdl`; the rest procedural (`tools/scene_arena.py`, `quakemdl.py`) | BSD-3-Clause (LibreQuake's models, textures and maps; its QuakeC is GPL-2 and not used) |
 | SPACE | procedural: `tools/scene_space.py` with `gsgen.py`, `meshgen.py`, `texgen.py` (PCG32 seeds; nothing fetched) | CC0-1.0 |
 | GSTEST | procedural: `tools/dbs.py` (`selftest2_scene`), the scene runtime's check | CC0-1.0 |
 
@@ -75,16 +76,27 @@ docstring and `src/core/scene.h`):
 | Tag | Content |
 |---|---|
 | NRML | a table of up to 256 unit normals, then one u8 index per vertex (lit models) |
-| GHDR | frames, story rate (25 frames/s), clear colour, fog, field of view, near and far planes, sun direction and colour, ambient colour, seed, sky model, the frame saved for image checks |
+| GHDR | frames, story rate (25 frames/s), clear colour, flags (fog; Quake's two-layer sky for a world), field of view, near and far planes, sun direction and colour, ambient colour, seed, sky model, the frame saved for image checks |
 | MODL | models: a run of batches, flags (lit on the CPU, animated), the next level of detail and the distance it takes over, bounding sphere |
 | VANM | vertex animations: per frame and vertex, x, y, z and a normal index in bytes, with a scale and origin (Quake MDL's packing) |
 | TRAK | tracks: evenly spaced keys (position, roll), open or closed; Catmull-Rom between them |
-| INST | instances: model, motion (static, along a track, spinning, orbiting), parent, the frames it exists, animation |
+| INST | instances: model, motion (static, along a track, spinning, orbiting), parent, the frames it exists, animation; flags: face the way it goes, never culled, placed in view space (a held weapon) |
 | PART | particle kinds: texture, additive or blended, flat or facing the camera, life, size, speed, spread, gravity, drag, rise, colours, spin |
 | EMIT | emitters: a particle kind at a steady rate from a point on an instance (or in the world) |
 | FXEV | bursts: a number of particles at one frame |
 | CAMS | shots: from frame to frame, a camera on a track, chasing, fixed, mounted on an instance, or orbiting |
 | SURF | batch effects: scrolling, warping (Quake water), lights switching on and off, pulsing or flickering |
+
+A version 2 file may also hold a Quake level's world (VISL and the batches
+`tools/bsp.py` makes, outside every model): the runtime then draws it as the
+level fly-through does (`src/core/lvworld.c`: visibility, the world's
+textures, a second lightmap pass, fences, flames), after the sky and before
+the models, and its water after the opaque models, so they show through it.
+With the Quake-sky flag its sky batches carry the front layer in their
+lightmap slot and both layers scroll across a flattened dome round the eye.
+Quake models come through `tools/quakemdl.py`: the frames a scene uses
+become VANM data (normals computed from each frame's triangles, not taken
+from the file), the skin is resampled to power-of-two sides.
 
 Rules for game-scene content, so every card and runtime draws the same:
 

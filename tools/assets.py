@@ -84,6 +84,9 @@ SCENES = {
     # Game scenes: made by a generator function ("module:function", in tools/), nothing fetched.
     "GSTEST": ("game", "dbs:selftest2_scene", [], "DOSBench (procedural)", CC0,
                "the scene runtime's check: every feature in one small scene"),
+    "ARENA": ("game", "scene_arena:build", ["lite.zip"], "LibreQuake v0.09-beta (lite), the LibreQuake project: "
+              "map lq_e0m1, soldier, dog, launcher and rocket models", "BSD-3-Clause",
+              "Arena: LibreQuake e0m1 as a game"),
     "SPACE": ("game", "scene_space:build", [], "DOSBench (procedural)", CC0,
               "Space battle: a station, a cruiser, fighters and an asteroid field"),
 }

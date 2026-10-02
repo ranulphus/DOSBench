@@ -12,7 +12,7 @@ enum { SC_BF_SKY = 1, SC_BF_TRANS = 2, SC_BF_ALPHATEST = 4, SC_BF_TWOSIDED = 8, 
 #define SC_NONE 0xFFFFu
 
 /* ---- Version 2: game scenes (tools/dbs.py describes the sections) ---- */
-enum { SC_GF_FOG = 1 };
+enum { SC_GF_FOG = 1, SC_GF_QSKY = 2 };    /* QSKY: the world's two-layer Quake sky */
 typedef struct {                        /* GHDR */
     uint32_t frames;
     float rate;                         /* story frames per second (25) */
@@ -36,7 +36,7 @@ typedef struct {                        /* MODL: batches drawn together, model s
 } sc_model;
 
 enum { SC_IK_STATIC, SC_IK_TRACK, SC_IK_SPIN, SC_IK_ORBIT };
-enum { SC_IF_FACE = 1, SC_IF_NOCULL = 2 };
+enum { SC_IF_FACE = 1, SC_IF_NOCULL = 2, SC_IF_VIEW = 4 };   /* VIEW: placed in view space (a held weapon) */
 typedef struct {                        /* INST: a model placed and moved */
     uint16_t model;
     uint8_t kind, flags;                /* SC_IK_*, SC_IF_* */

@@ -13,7 +13,9 @@
    "_about": "Per card (the output directory's name), per test, over any kind: what the card cannot draw the same way.",
    "g100": {
      "S1BLND": {"box": true, "_why": "the G100 blends by stipple (MGA-Glide D8, DOS-GL likewise): compared through a 4x4 box filter, as in MGA-Glide's conformance manifest"},
-     "L1LQ2P": {"advisory": true, "_why": "the second pass multiplies by the destination, which the G100 cannot do: MGA-Glide skips it (D8), DOS-GL supports the G100 for development only"}
+     "L1LQ2P": {"advisory": true, "_why": "the second pass multiplies by the destination, which the G100 cannot do: MGA-Glide skips it (D8), DOS-GL supports the G100 for development only"},
+     "G1ARNA": {"advisory": true, "_why": "two-pass lightmaps as L1LQ2P; the smoke and the sky's front layer are stippled"},
+     "B1SCN": {"advisory": true, "_why": "the runtime's check scene is mostly blended and additive quads and particles, which the G100 stipples"}
    }
  }
 }

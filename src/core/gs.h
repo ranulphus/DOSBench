@@ -14,6 +14,7 @@
 #define GS_H
 #include "bench.h"
 #include "cull.h"
+#include "lvworld.h"
 #include "scene.h"
 
 typedef struct {
@@ -49,6 +50,7 @@ typedef struct {
     int have_last;
     rb_tex *last_tex;
     double tris;                        /* triangles drawn this frame */
+    lv_world *lv;                       /* a Quake level's world (NULL: none), drawn with the passes */
 } gs_world;
 
 /* After sc_upload(sc, 1). 0, or -1 with why. */
@@ -75,6 +77,7 @@ void gsfx_particles(gs_world *w);                       /* fill w->pt for w->t *
 void gsfx_draw_particles(gs_world *w, int additive);
 /* A batch's vertices for this frame into w->vbuf (lit with lut when not NULL). */
 void gsfx_vertices(gs_world *w, int inst, int batch, const uint16_t *lut);
+void gsfx_surface(const sc_surf *s, rb_vertex *v, uint32_t n, double t, uint32_t seed);
 void gs_set_state(gs_world *w, const rb_state *st);
 void gs_bind(gs_world *w, rb_tex *t);
 

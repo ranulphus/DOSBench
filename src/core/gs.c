@@ -522,6 +522,11 @@ double gs_frame(gs_world *w, int f)
         inst_local(sc, n, w->t, &w->world[i]);
         if (n->parent != SC_NONE)
             m4_mul(&w->world[i], &w->world[n->parent], &w->world[i]);
+        else if (n->flags & SC_IF_VIEW) {       /* held: its placement is in view space */
+            mat4 inv;
+            m4_rigid_inverse(&inv, &w->view);
+            m4_mul(&w->world[i], &inv, &w->world[i]);
+        }
         md = &sc->model[n->model];
         point(&w->world[i], md->centre, c);
         sx = v3_dot(w->world[i].m, w->world[i].m);
@@ -547,10 +552,22 @@ gone:
     }
     if (g->sky != SC_NONE)
         draw_sky(w);
+    if (w->lv) {                                /* the level's world: sky, walls, lightmaps, flames */
+        rb_set_matrices(&w->proj, &w->view);
+        w->tris += lv_draw_opaque(w->lv, &w->view, w->eye, &w->fr, w->t);
+        w->have_last = 0;
+        w->last_tex = (rb_tex *)&w->last_tex;
+    }
     for (i = 0; i < nb; i++)
         draw_pass(w, w->order[i], P_OPAQUE);
     for (i = 0; i < nb; i++)
         draw_pass(w, w->order[i], P_DECAL);
+    if (w->lv) {                                /* its water, over what is under it */
+        rb_set_matrices(&w->proj, &w->view);
+        lv_draw_water(w->lv, w->t);
+        w->have_last = 0;
+        w->last_tex = (rb_tex *)&w->last_tex;
+    }
     sort_depth = w->depth;
     qsort(w->order, (size_t)nb, sizeof *w->order, far_first);
     for (i = 0; i < nb; i++)

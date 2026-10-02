@@ -394,6 +394,26 @@ SKIP = ("clip", "trigger", "skip", "hint", "origin", "null", "nodraw")
 
 
 def convert(args):
+    """The level fly-through (LQE0M1): the world, its visibility, and the camera path."""
+    s, bsp, info = world(args)
+    keys, frames, npoints, length = camera_path(bsp)
+    s.view = dict(kind=1, frames=frames, znear=4.0, zfar=4096.0, keys=keys)
+    s.info.update(map=args["map"], faces=str(info["faces"]), lightmap_pages=str(info["pages"]),
+                  texture_halvings=str(info["halvings"]), tex16_bytes=str(info["tex16"]), path_points=str(npoints),
+                  path_length=str(int(length)), sprites=str(info["sprites"]))
+    print("bsp: %s: %d faces, %d textures (%d halvings), %d lightmap pages, %d leaves, %d marks, "
+          "path %d points %.0f units %d frames, %d sprites, %d B texture memory" %
+          (args["map"], info["faces"], info["textures"], info["halvings"], info["pages"], info["leaves"],
+           info["marks"], npoints, length, frames, info["sprites"], info["tex16"]))
+    return s
+
+
+def world(args):
+    """The map's world as a scene (batches, textures, lightmaps, flame sprites,
+    VISL), the parsed BSP, and what the conversion did. args: map; budget
+    (texture bytes the world may use; default BUDGET); sky_layers (keep Quake's
+    front sky layer as a texture of its own, in the sky batches' lightmap slot,
+    for the runtime's two-layer sky)."""
     import assets
     data, palette = load_from_lite(assets.src(LITE), args["map"])
     bsp = Bsp(data)
@@ -411,10 +431,18 @@ def convert(args):
         faces.append(fi)
         used.setdefault(ti[8], mt)
     tex_img = {}
+    sky_front = None
     for mi, (name, w, h, pix) in used.items():
         rgba = miptex_rgba(pix, palette, name.startswith("{"))
         if name.startswith("sky") and w == 2 * h:
             half = w // 2                       # the back layer: the right half
+            if args.get("sky_layers"):          # the front layer: the left half, index 0 clear
+                front = bytearray(b"".join(rgba[(y * w) * 4:(y * w + half) * 4] for y in range(h)))
+                for y in range(h):
+                    for x in range(half):
+                        if pix[y * w + x] == 0:
+                            front[(y * half + x) * 4 + 3] = 0
+                sky_front = dbs.fit_texture(half, h, bytes(front), 256)
             rgba = b"".join(rgba[(y * w + half) * 4:(y * w + w) * 4] for y in range(h))
             w = half
         tw, th, trgba = dbs.fit_texture(w, h, rgba, 256)
@@ -441,9 +469,10 @@ def convert(args):
     lm_bytes = len(atlas.pages) * LM_PAGE * LM_PAGE
 
     def tex_bytes():
-        return sum(t[3] * t[4] * 2 * 4 // 3 for t in tex_img.values()) + lm_bytes + 32 * 64 * 2
+        extra = sky_front[0] * sky_front[1] * 2 if sky_front else 0
+        return sum(t[3] * t[4] * 2 * 4 // 3 for t in tex_img.values()) + lm_bytes + 32 * 64 * 2 + extra
     halvings = 0
-    while tex_bytes() > BUDGET:
+    while tex_bytes() > args.get("budget", BUDGET):
         big = max(tex_img.values(), key=lambda t: t[3] * t[4])
         if big[3] <= 16 and big[4] <= 16:
             break
@@ -461,6 +490,7 @@ def convert(args):
         lm_index.append(s.add_texture(LM_PAGE, LM_PAGE, bytes(rgba), dbs.TF_LIGHTMAP | dbs.TF_CLAMP))
     fw, fh, frgba = flame_texture()
     flame = s.add_texture(fw, fh, frgba, 0)
+    front_index = s.add_texture(sky_front[0], sky_front[1], sky_front[2], 0) if sky_front else dbs.NONE
     # Faces into batches keyed by (texture, lightmap page, flags).
     groups = {}
     for fi in faces:
@@ -477,7 +507,7 @@ def convert(args):
         elif name.startswith("{"):
             flags = dbs.BF_ALPHATEST
         lm = lm_of.get(fi)
-        key = (tex_index[ti[8]], lm_index[lm[0]] if lm else dbs.NONE, flags)
+        key = (tex_index[ti[8]], lm_index[lm[0]] if lm else front_index if flags == dbs.BF_SKY else dbs.NONE, flags)
         verts = []
         for p in bsp.face_points(f):
             sc = p[0] * ti[0] + p[1] * ti[1] + p[2] * ti[2] + ti[3]
@@ -560,13 +590,6 @@ def convert(args):
     vis += head + b"".join(node_out) + b"".join(leaf_out) + struct.pack("<%dI" % len(marks_out), *marks_out)
     vis += b"".join(face_out) + bsp.vis
     s.vis = bytes(vis) + b"\0" * (-len(vis) % 4)
-    keys, frames, npoints, length = camera_path(bsp)
-    s.view = dict(kind=1, frames=frames, znear=4.0, zfar=4096.0, keys=keys)
-    s.info.update(map=args["map"], faces=str(len(faces)), lightmap_pages=str(len(atlas.pages)),
-                  texture_halvings=str(halvings), tex16_bytes=str(tex_bytes()), path_points=str(npoints),
-                  path_length=str(int(length)), sprites=str(len(sprites)))
-    print("bsp: %s: %d faces, %d textures (%d halvings), %d lightmap pages, %d leaves, %d marks, "
-          "path %d points %.0f units %d frames, %d sprites, %d B texture memory" %
-          (args["map"], len(faces), len(tex_img), halvings, len(atlas.pages), nleaves, len(marks_out), npoints,
-           length, frames, len(sprites), tex_bytes()))
-    return s
+    return s, bsp, dict(faces=len(faces), textures=len(tex_img), halvings=halvings, pages=len(atlas.pages),
+                        leaves=nleaves, marks=len(marks_out), sprites=len(sprites), tex16=tex_bytes(), palette=palette,
+                        tex_names={tex_index[mi]: t[0] for mi, t in tex_img.items()})
