@@ -52,6 +52,9 @@ BENCHG  [options] --glide=PATH      Glide via an OVL (DOS/4GW; needs DOS4GW.EXE)
                       640x480 when it is among --modes (every card and the Voodoo
                       have it, so the image checks compare like with like), else the first
   --shot-frames F,..  also save these frames (camera paths: along the path), same mode
+  --frames N          camera paths: only N frames, from --start F (default 0): a stretch of
+                      each path for quick comparisons of builds (not a score: the scenes'
+                      fixed frame counts are what the scores and results compare)
   --data DIR          scene files (default C:\DOSBENCH\DATA)
   --out DIR           results and frames (default C:\OUT)
   --tag C             image-name prefix (default G or L)

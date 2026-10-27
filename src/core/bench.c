@@ -10,7 +10,7 @@
  *   BENCHG [--tests LIST | --tests-from FILE] [--modes WxH,...|all] [--quick] [--shots] [--vsync]
  *          [--args FILE (more arguments from a file)]
  *          [--submit arrays|lists|immediate] [--secs S] [--data DIR]
- *          [--tag C] [--shot-frames F,...] [--list] [--glide=PATH] [--out DIR]
+ *          [--tag C] [--shot-frames F,...] [--frames N [--start F]] [--list] [--glide=PATH] [--out DIR]
  *          [--captions S] [--session ID] [--noexit]
  */
 #include "bench.h"
@@ -34,6 +34,7 @@ db_opts db;
 
 static const char *tests_arg = "all";
 static const char *shot_frames;         /* --shot-frames a,b,...: extra saved frames */
+static int frame_cap, frame0;           /* --frames N --start F: N frames of a camera path from F */
 static const char *modes_arg = "640x480";
 static const char *session = "-";      /* --session: the menu's id for one run of both programs */
 static int list_only;
@@ -150,8 +151,14 @@ static void run_test(const test_def *d, int i, int ni, int k, int kn, const db_r
     }
     if (d->parent[0] && pr_caption(d, &t, i, ni, k, kn, before))
         db.aborted = 1;                 /* Esc: this test still runs */
-    if (t.frames > 0)                   /* a camera path: fixed frames (a few in --quick) */
+    if (t.frames > 0) {                 /* a camera path: fixed frames (a few in --quick) */
         cap = db.quick && t.frames > db.max_frames ? db.max_frames : t.frames;
+        if (frame_cap > 0) {            /* a stretch of it, for quick comparisons */
+            if (frame0 >= t.frames)
+                frame0 = 0;
+            cap = frame_cap < t.frames - frame0 ? frame_cap : t.frames - frame0;
+        }
+    }
     ft = (double *)malloc((size_t)cap * sizeof *ft);
     sub = (double *)malloc((size_t)cap * sizeof *sub);
     if (!ft || !sub) {
@@ -161,7 +168,7 @@ static void run_test(const test_def *d, int i, int ni, int k, int kn, const db_r
         return;
     }
     for (f = 0; f < db.warm; f++) {
-        d->impl->frame(&t, f);
+        d->impl->frame(&t, t.frames > 0 ? frame0 + f : f);
         rb_swap();
     }
     rb_finish();
@@ -170,7 +177,7 @@ static void run_test(const test_def *d, int i, int ni, int k, int kn, const db_r
     t0 = prev = tmr_now();
     for (;;) {
         a = tmr_now();
-        d->impl->frame(&t, n);
+        d->impl->frame(&t, t.frames > 0 ? frame0 + n : n);
         b = tmr_now();
         rb_swap();
         c = tmr_now();
@@ -397,6 +404,8 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--data") && v) { db.data = v; i++; }
         else if (!strcmp(a, "--tag") && v) { db.tag = v[0]; i++; }
         else if (!strcmp(a, "--shot-frames") && v) { shot_frames = v; i++; }
+        else if (!strcmp(a, "--frames") && v) { frame_cap = atoi(v); i++; }
+        else if (!strcmp(a, "--start") && v) { frame0 = atoi(v); i++; }
         else if (!strcmp(a, "--submit") && v) {
             db.submit = !strcmp(v, "lists") ? RB_SUBMIT_LISTS : !strcmp(v, "immediate") ? RB_SUBMIT_IMMEDIATE
                                                                                        : RB_SUBMIT_ARRAYS;
