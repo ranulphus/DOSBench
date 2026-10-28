@@ -159,8 +159,8 @@ Output: `out/loopa/<card>/` (`serial.log`, `files/RESULTS.TXT`,
 
 The game tests (`docs/tests.md`, group `game`) need DOS-GL's Quake and
 Half-Life builds (`make quake`, `make halflife` in DOS-GL) and the game
-fixtures (DOS-GL's `tools/quake/fixtures.py`, `tools/quake/q2record.sh
-q2bench1` for the Quake 2 demo, `tools/halflife/fixtures.py` and
+fixtures (DOS-GL's `tools/quake/fixtures.py`; Quake 2's demos are id's own,
+in its `pak0.pak`; `tools/halflife/fixtures.py` and
 `DEMO=hlbench1 MAP=c0a0` / `DEMO=hlbench2 MAP=c1a2 tools/halflife/run.sh
 record` for the Half-Life demos). Half-Life runs on a 128 MB PC. The
 PrBoom-plus tests (`PBD*`) need DOS-GL's `tools/doom/build.sh` and the

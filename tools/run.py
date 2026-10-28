@@ -737,7 +737,7 @@ What is on D: (the Quakes in DOS-GL's builds, on the Matrox card; D:\\ is on PAT
   QUAKE2        Quake 2 (retail; your copy). Options go to the game:
                 +set gl_ext_multitexture 1 (G400/G450; off by default in the
                 DOS port), +set gl_ext_palettedtexture 1,
-                +set timedemo 1 +demomap q2bench1.dm2 (a demo you recorded).
+                +set timedemo 1 +demomap demo1.dm2 (id's own; demo2.dm2 too).
   The games start with sound enabled on the Sound Blaster 16 (BLASTER is set
   at boot; add -nosound, or +set s_initsound 0 for Quake 2, to turn it off).
   The games are in

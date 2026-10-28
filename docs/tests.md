@@ -120,7 +120,18 @@ Half-Life) and save frame 200 as `L<ID>.PPM`; game time advances a fixed
 step per frame (`-fixedtime`, `fixedtime 14`, `host_framerate 0.02`, with
 Half-Life's random numbers seeded by `td_seed`), so every run and every card
 draws the same frames. Vsync is off, as everywhere in DOSBench (`DGL_VSYNC=0`:
-GLQuake and Quake 2 have no switch for it). The catalogue is `tools/games.json`.
+GLQuake and Quake 2 have no switch for it).
+
+Each timedemo saves frame 200 for the image checks (`L<ID>.PPM` and the `crc`).
+That capture (the frame read back from the card, its CRC, the file) takes
+about a second on a G400, and since 2026-10-28 it is left out of the frame
+times and `secs`: results before that count it in the frame after it, so their
+`max_ms` is the capture and their fps are low by that second (3% for
+GLQuake's demo1, 10% for a demo as short as `q2bench1`). Until 2026-10-28,
+Q2D1 played `q2bench1`, a scripted walk through base1 recorded by DOS-GL's
+`tools/quake/q2record.sh`: those results don't compare with id's `demo1`.
+
+The catalogue is `tools/games.json`.
 
 | ID | Timedemo | Checked against |
 |---|---|---|
@@ -128,9 +139,10 @@ GLQuake and Quake 2 have no switch for it). The catalogue is `tools/games.json`.
 | Q1D1M | the same with multitexture lightmaps (`-mtex`) | Q1D1; skipped until DOS-GL has `GL_ARB_multitexture` |
 | Q1D1P | the same with 8-bit paletted textures (`-8bit`) | Q1D1 |
 | Q1LQ1 | GLQuake `demo1` on LibreQuake (free data) | the first card |
-| Q2D1 | Quake 2 `q2bench1` (base1 walked and fired through; recorded by DOS-GL's `tools/quake/q2record.sh`) | the first card |
+| Q2D1 | Quake 2 `demo1`: id's own demo in the retail `pak0.pak` (Installation), recorded with the first release (protocol 26); q2dos plays it through id's own allowance for release demos | the first card |
 | Q2D1M | the same with multitexture lightmaps | Q2D1; skipped until DOS-GL has `GL_ARB_multitexture` |
 | Q2D1P | the same with 8-bit paletted textures | Q2D1, looser: Quake 2 re-quantises its textures to the palette |
+| Q2D2 | Quake 2 `demo2`: id's own (Pumping Station 1) | the first card |
 | HLD1 | Half-Life (WON) `hlbench1`: the c0a0 tram ride, world geometry (recorded by DOS-GL's `tools/halflife/run.sh record`); 128 MB PC, no sound | the first card |
 | HLD2 | Half-Life (WON) `hlbench2`: c1a2, the map with the most monsters, MP5 fire | the first card |
 | HLD1V | HLD1 on Xash3D's VBO path (`gl_vbo 1`): world lightmaps in the second texture unit, one pass (G400/G450: DOS-GL's buffer objects and combine) | HLD1 |
