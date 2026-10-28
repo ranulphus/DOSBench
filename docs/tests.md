@@ -119,7 +119,8 @@ own H and T lines (`-dosbench` in Quake, `td_dbtest` in Quake 2 and
 Half-Life) and save frame 200 as `L<ID>.PPM`; game time advances a fixed
 step per frame (`-fixedtime`, `fixedtime 14`, `host_framerate 0.02`, with
 Half-Life's random numbers seeded by `td_seed`), so every run and every card
-draws the same frames. The catalogue is `tools/games.json`.
+draws the same frames. Vsync is off, as everywhere in DOSBench (`DGL_VSYNC=0`:
+GLQuake and Quake 2 have no switch for it). The catalogue is `tools/games.json`.
 
 | ID | Timedemo | Checked against |
 |---|---|---|

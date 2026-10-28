@@ -516,6 +516,7 @@ def games_job(card, key, tests, a):
            "--name", "dosbench-%s-%s" % (key, card), "--card", card, "--out", out,
            "--games-file", gfile, "--game", key, "--pre", "SET DGL_EXIT_AFTER=0",
            "--pre", "SET DGL_STATS=1",               # a line a second: long timedemos are not idle
+           "--pre", "SET DGL_VSYNC=0",               # vsync off, as every DOSBench measurement (Quake has no switch)
            "--timeout", str(a.timeout), "--idle", str(a.idle)] + extra
     for f in files:
         cmd += ["--file", f]
@@ -596,7 +597,7 @@ def doom_job(card, tests, a):
     cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "loopa", "run.py"),
            "--name", "dosbench-doom-%s" % card, "--card", card, "--out", out,
            "--games-file", gfile, "--game", "doom", "--pre", "SET DOOM_SERIAL=1", "--pre", "SET LFN=n",
-           "--timeout", str(a.timeout), "--idle", str(a.idle)]
+           "--pre", "SET DGL_VSYNC=0", "--timeout", str(a.timeout), "--idle", str(a.idle)]
     for f in files:
         cmd += ["--file", f]
     for c in cmds:
