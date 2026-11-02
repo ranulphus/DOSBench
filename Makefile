@@ -5,25 +5,23 @@
 #   make scene-stats      replay the scenes on the host: determinism, triangles, fill
 #   make data             fetch and convert the scenes (tools/assets.py)
 #   make loopa CARD=g450  run both programs in 86Box (tools/run.py)
-#   make check-deps       sibling checkouts at or after the pinned commits
+#   make check-deps       the sibling checkouts are there (MGA-Glide, DOS-GL: their main as it is)
 include config.mk
 -include config.local.mk
-include deps.mk
 
 BUILD_ID := $(shell git describe --always --dirty 2>/dev/null || echo unknown)
 Q ?= @
-MGAHAL := $(DOSGL)/third_party/mgahal
+MGAHAL := $(MGA_GLIDE)
 
 CORE_SRCS := $(wildcard src/core/*.c)
 .PHONY: all deps check-deps tests-host data loopa clean help scene-stats
 all: build/dos/BENCHG.EXE build/dos/BENCHGL.EXE build/dos/DBMENU.EXE
 
 # ---- Sibling checkouts --------------------------------------------------
+# No pins (the owner's decision, 2026-11-02: before alpha everything is on main trunk).
 check-deps:
-	@for d in "$(MGA_GLIDE):$(MGA_GLIDE_PIN)" "$(DOSGL):$(DOSGL_PIN)"; do \
-	  dir=$${d%%:*}; pin=$${d##*:}; \
-	  git -C "$$dir" merge-base --is-ancestor "$$pin" HEAD 2>/dev/null \
-	    || { echo "$$dir is not at or after $$pin (deps.mk)"; exit 1; }; \
+	@for d in "MGA_GLIDE $(MGA_GLIDE)/hal/include/mga/hal.h" "DOSGL $(DOSGL)/include/GL/gl.h"; do \
+	  [ -f "$${d#* }" ] || { echo "check-deps: no $${d%% *} checkout ($${d#* } is missing)"; exit 1; }; \
 	done
 # The pieces DOSBench uses from each, built in place.
 deps: check-deps

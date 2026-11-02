@@ -4,8 +4,8 @@
 
 DOSBench builds against sibling checkouts of MGA-Glide (the Glide loader,
 the test shim and the shared HAL, the Loop A and bench harnesses) and DOS-GL
-(`libGL.a`), at or after the commits pinned in `deps.mk`
-(`config.mk` has the paths; override them in `config.local.mk`).
+(`libGL.a`), each on its main as it is, with no pins (`config.mk` has the
+paths; override them in `config.local.mk`).
 
 ```
 make                      # build/dos/BENCHG.EXE, BENCHGL.EXE, DBMENU.EXE

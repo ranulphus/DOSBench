@@ -1,7 +1,7 @@
 # Build configuration; override in config.local.mk (not committed).
 # DOSBench builds against sibling checkouts of MGA-Glide (Glide runtime,
-# shared HAL, test shim, Loop A harness) and DOS-GL (libGL.a); deps.mk pins
-# the commits they must be at or descended from.
+# shared HAL, test shim, Loop A harness) and DOS-GL (libGL.a), each on its main
+# as it is (no pins).
 MGA_GLIDE    ?= $(HOME)/MGA-Glide
 DOSGL        ?= $(HOME)/DOSGL
 FIFTHWHEEL   ?= $(HOME)/FifthWheel
