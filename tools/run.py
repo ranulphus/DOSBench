@@ -67,7 +67,7 @@ def make_vars():
                 if "?=" in line and m.group(1) in vals and m.group(1) != "HOME":
                     continue
                 vals[m.group(1)] = val
-    for k in ("MGA_GLIDE", "DOSGL", "FIFTHWHEEL"):
+    for k in ("MGA_GLIDE", "DOSGL", "FIFTHWHEEL", "ECHOES"):
         if os.environ.get(k):
             vals[k] = os.environ[k]
     return vals
@@ -527,27 +527,41 @@ def games_job(card, key, tests, a):
     return out
 
 
-def fw_job(card, tests, a):
-    """Fifth Wheel's tests (FIFTHWHEEL: its game and the dgk kit on DOS-GL):
-    no retail data, so everything goes on C:. FW1 times 3,000 frames of the
-    autopilot driving its generated world (FW1L at the LOW detail preset, FW1H
-    at HIGH with the camera pulled right back); FWP is the performance probe.
-    BUDGET.CFG, the presets' numbers, goes beside the game when the build has
-    one. The game writes its own H and T lines (dgk/bench.h)."""
-    fw = VARS.get("FIFTHWHEEL", os.path.expanduser("~/FifthWheel"))
-    q = rsp_dir = os.path.join(ROOT, "build", "games", "fifthwheel")
+# The games built on dgk (the DOS-GL Kit), which write their own H and T lines
+# (dgk/bench.h): their checkout's variable, its default, the files they need
+# on C:\TEST (and the optional ones), and how to build them.
+DGK_GAMES = {
+    "fifthwheel": ("FIFTHWHEEL", "~/FifthWheel", ("build/dos/FWHEEL.EXE", "build/data/WORLD.PAK"),
+                   (("build/data/budget.cfg", "BUDGET.CFG"),), "Fifth Wheel: make dos"),
+    "echoes": ("ECHOES", "~/Frontier", ("build/dos/ECHOES.EXE",), (), "Echoes of the Void: make dos"),
+}
+
+
+def fw_job(card, tests, a, key="fifthwheel"):
+    """A dgk game's tests (Fifth Wheel, Echoes of the Void: each its game and
+    the dgk kit on DOS-GL): no retail data, so everything goes on C:. FW1
+    times 3,000 frames of Fifth Wheel's autopilot driving its generated world
+    (FW1L at the LOW detail preset, FW1H at HIGH with the camera pulled right
+    back); FWP is its performance probe; BUDGET.CFG, the presets' numbers,
+    goes beside it when the build has one. ECH1 times Echoes of the Void's
+    paced descent from orbit to the ground. The games write their own H and
+    T lines (dgk/bench.h)."""
+    var, default, need, optional, how = DGK_GAMES[key]
+    src_dir = VARS.get(var, os.path.expanduser(default))
+    q = rsp_dir = os.path.join(ROOT, "build", "games", key)
     os.makedirs(q, exist_ok=True)
-    for src, name in ((os.path.join(fw, "build", "dos", "FWHEEL.EXE"), "FWHEEL.EXE"),
-                      (os.path.join(fw, "build", "data", "WORLD.PAK"), "WORLD.PAK")):
+    files = []
+    for rel in need:
+        src, name = os.path.join(src_dir, rel), os.path.basename(rel).upper()
         if not os.path.exists(src):
-            raise SystemExit("run.py: no %s (Fifth Wheel: make dos)" % src)
+            raise SystemExit("run.py: no %s (%s)" % (src, how))
         shutil.copyfile(src, os.path.join(q, name))
-    out = os.path.join(ROOT, "out", "games", card, "fifthwheel")
-    files = ["%s=/TEST/FWHEEL.EXE" % os.path.join(q, "FWHEEL.EXE"), "%s=/TEST/WORLD.PAK" % os.path.join(q, "WORLD.PAK")]
-    budget = os.path.join(fw, "build", "data", "budget.cfg")   # the detail presets' numbers (optional)
-    if os.path.exists(budget):
-        shutil.copyfile(budget, os.path.join(q, "BUDGET.CFG"))
-        files.append("%s=/TEST/BUDGET.CFG" % os.path.join(q, "BUDGET.CFG"))
+        files.append("%s=/TEST/%s" % (os.path.join(q, name), name))
+    out = os.path.join(ROOT, "out", "games", card, key)
+    for rel, name in optional:                                  # (the detail presets' numbers)
+        if os.path.exists(os.path.join(src_dir, rel)):
+            shutil.copyfile(os.path.join(src_dir, rel), os.path.join(q, name))
+            files.append("%s=/TEST/%s" % (os.path.join(q, name), name))
     cmds = ["C:", "CD \\TEST"]
     for tid, t in tests.items():
         rsp = os.path.join(rsp_dir, tid + ".RSP")
@@ -556,14 +570,14 @@ def fw_job(card, tests, a):
         files.append("%s=/TEST/%s.RSP" % (rsp, tid))
         cmds += ["SERSAY HX-START %s" % tid, "%s @C:\\TEST\\%s.RSP" % (t["exe"], tid), "SERSAY HX-DONE 0"]
     cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "loopa", "run.py"),
-           "--name", "dosbench-fifthwheel-%s" % card, "--card", card, "--out", out,
+           "--name", "dosbench-%s-%s" % (key, card), "--card", card, "--out", out,
            "--pre", "SET DGL_STATS=1", "--pre", "SET SDL_AUDIO_DRIVER=dummy",
            "--timeout", str(a.timeout), "--idle", str(a.idle)]
     for f in files:
         cmd += ["--file", f]
     for c in cmds:
         cmd += ["--cmd", c]
-    print("games %s fifthwheel: %s" % (card, " ".join(tests)))
+    print("games %s %s: %s" % (card, key, " ".join(tests)))
     subprocess.run(cmd, cwd=ROOT)
     return out
 
@@ -632,7 +646,7 @@ def cmd_games(a):
             print("  %-5s %-6s skip why=no-%s" % (card, k, cat[k]["needs"]))
         for key in sorted(set(t["game"] for t in runnable.values())):
             tests = {k: v for k, v in runnable.items() if v["game"] == key}
-            out = (fw_job(card, tests, a) if key == "fifthwheel" else doom_job(card, tests, a) if key == "doom"
+            out = (fw_job(card, tests, a, key) if key in DGK_GAMES else doom_job(card, tests, a) if key == "doom"
                    else games_job(card, key, tests, a))
             dirs.setdefault(key, []).append(out)
             recs = game_results(out)

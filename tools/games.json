@@ -32,6 +32,8 @@
            "exe": "FWHEEL.EXE", "args": "-nosound -novsync -fixed -autopilot -frames 3000 -detail high -zoom 2 -dbtest FW1H"},
  "FWP":   {"game": "fifthwheel", "what": "Fifth Wheel's performance probe: T lines FWP-<tris>-<path>[-tex] and FWP-<tris>-d<draws> (triangles, draw calls, texturing, submission paths)",
            "exe": "FWHEEL.EXE", "args": "-nosound -novsync -probe"},
+ "ECH1":  {"game": "echoes", "what": "Echoes of the Void: the paced descent from three radii to a planet's ground (-descend), one tick per frame, vsync off, at the LOW preset (the game writes its own H/T lines, dgk/bench.h)",
+           "exe": "ECHOES.EXE", "args": "-nosound -novsync -fixed -descend -dbtest ECH1"},
  "PBD1":  {"game": "doom", "what": "PrBoom-plus timedemo: Doom II demo1 (MAP11) on the OpenGL renderer through DOS-GL (the fork's GL compatibility path, screen sky)",
            "exe": "PRBOOMP.EXE", "args": "-iwad DOOM2.WAD -vidmode gl -width 640 -height 480 -nosound -timedemo demo1 -dosbench C:/OUT PBD1 -dbshot 200"},
  "PBD1S": {"game": "doom", "what": "PrBoom-plus timedemo: Doom II demo1 on the software renderer (8-bit VESA mode: the CPU's work, no GL)",
