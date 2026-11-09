@@ -23,9 +23,10 @@ from: 86Box's speed says nothing about a real card's. `--save FILE` and
 `--against FILE` keep and compare the frames' hashes across a change that
 must not alter any frame.
 
-`make` first builds what it needs in the sibling checkouts (MGA-Glide's
-generated Glide table, HAL library, `GLIDE2X.OVL` and DOS helpers; DOS-GL's
-`libGL.a`). The toolchains are MGA-Glide's (`make setup-ow setup-djgpp` there).
+`make` first builds what it needs in RetroGPU's checkout (`RETROGPU`,
+default `~/RetroGPU`): the generated Glide table, the HAL library,
+`GLIDE2X.OVL` and the DOS helpers at its root, DOS-GL's `libGL.a` in its
+`gl/`. The toolchains are RetroGPU's (`make setup-ow setup-djgpp` there).
 
 ## The programs
 
@@ -103,13 +104,13 @@ python3 tools/run.py winvm --card g450 --games   # dist/dosbench-g450-games-vm.z
 A ready-to-boot 86Box machine (Loop A's: Pentium II 350, the emulated card
 plus a Voodoo Graphics, Sound Blaster 16, FreeDOS) with DOSBench and its
 menu in `C:\DOSBENCH`, DOS-GL's demos in `C:\DOSGL` and ClassiCube in
-`C:\CC`; its `README.txt` lists them. It needs MGA-Glide's patched 86Box:
-on Linux the one `make 86box` builds, on Windows the one MGA-Glide's
+`C:\CC`; its `README.txt` lists them. It needs RetroGPU's patched 86Box:
+on Linux the one `make 86box` builds, on Windows the one RetroGPU's
 Windows kit builds (`tools/86box/mkwinkit.sh`, then `build-windows.sh` in
 MSYS2). The zip holds the converted scenes, including the Stanford scans:
 keep it to yourself.
 
-`--games` also installs GTA and Screamer Rally from MGA-Glide's local game
+`--games` also installs GTA and Screamer Rally from the platform's local game
 fixtures into `C:\GAMES`, with launchers: `GTA` and `SR` run them on
 MGA-Glide on the Matrox card, `GTA 3DFX` and `SR 3DFX` on 3dfx's runtime on
 the Voodoo. That zip holds retail games: it is only for their owner's
@@ -128,7 +129,7 @@ One VM per card (the emulated Matrox card and an emulated Voodoo Graphics)
 runs, in one job: BENCHGL (tag L), BENCHG on MGA-Glide's OVL (tag G) and, on
 the first card, BENCHG on 3dfx's OVL on the Voodoo (tag V; `REF_OVL`,
 default the GTA fixture in `~/.cache/mga-glide/fixtures/ovl/`). Then the
-frame checks, with MGA-Glide's `tools/imgcmp.py` (tolerances in
+frame checks, with RetroGPU's `tools/imgcmp.py` (tolerances in
 `tools/checks.json`):
 
 | Check | Gates |
@@ -185,24 +186,24 @@ directories like Loop A's.
 
 ## The bench (Loop B): numbers
 
-Bench PCs are provisioned as in MGA-Glide's `docs/bench.md`. Once per PC,
+Bench PCs are provisioned as in RetroGPU's `docs/bench.md`. Once per PC,
 copy the scenes over, then queue jobs:
 
 ```
 python3 tools/run.py bench --pc bench-g450 --install-data
 python3 tools/run.py bench --pc bench-g450                       # all tests, 640x480
 python3 tools/run.py bench --pc bench-g450 --modes 640x480,800x600 --submit lists
-python3 tools/report.py ingest ~/MGA-Glide/out/bench/bench-g450/<job> --pc bench-g450
+python3 tools/report.py ingest ~/RetroGPU/out/bench/bench-g450/<job> --pc bench-g450
 ```
 
 A job runs BENCHGL then BENCHG (on the job's `GLIDE2X.OVL`) and uploads
 `C:\OUT`. The virtual bench PC is the dry run:
 
 ```
-cd ~/MGA-Glide && MGA_DOCKER_NETWORK=host tools/dev python3 tools/bench/vpc.py start g450 &
+cd ~/RetroGPU && MGA_DOCKER_NETWORK=host tools/dev python3 tools/bench/vpc.py start g450 &
 python3 tools/run.py bench --pc vbench-g450 --install-data
 python3 tools/run.py bench --pc vbench-g450 --tests basic,S1 --secs 1
-cd ~/MGA-Glide && python3 tools/bench/vpc.py stop g450
+cd ~/RetroGPU && python3 tools/bench/vpc.py stop g450
 ```
 
 ## Reports

@@ -5,58 +5,62 @@
 #   make scene-stats      replay the scenes on the host: determinism, triangles, fill
 #   make data             fetch and convert the scenes (tools/assets.py)
 #   make loopa CARD=g450  run both programs in 86Box (tools/run.py)
-#   make check-deps       the sibling checkouts are there (MGA-Glide, DOS-GL: their main as it is)
+#   make check-deps       RetroGPU's checkout is there (its main as it is)
 include config.mk
 -include config.local.mk
 
 BUILD_ID := $(shell git describe --always --dirty 2>/dev/null || echo unknown)
 Q ?= @
-MGAHAL := $(MGA_GLIDE)
+MGAHAL := $(RETROGPU)
+DOSGL  := $(RETROGPU)/gl
+# Dependency files from before RetroGPU (2026-11-08) name ~/MGA-Glide's and ~/DOSGL's trees, which are
+# retired: they and their objects are dropped once, so the next build makes them afresh against RetroGPU.
+$(foreach d,$(shell grep -rlE '/(MGA-Glide|DOSGL)/' build --include='*.d' 2>/dev/null),$(shell rm -f $(d) $(d:.d=.o) $(d:.d=.obj)))
 
 CORE_SRCS := $(wildcard src/core/*.c)
 .PHONY: all deps check-deps tests-host data loopa clean help scene-stats
 all: build/dos/BENCHG.EXE build/dos/BENCHGL.EXE build/dos/DBMENU.EXE
 
-# ---- Sibling checkouts --------------------------------------------------
+# ---- RetroGPU's checkout -------------------------------------------------
 # No pins (the owner's decision, 2026-11-02: before alpha everything is on main trunk).
 check-deps:
-	@for d in "MGA_GLIDE $(MGA_GLIDE)/hal/include/mga/hal.h" "DOSGL $(DOSGL)/include/GL/gl.h"; do \
+	@for d in "RETROGPU $(RETROGPU)/hal/include/mga/hal.h" "RETROGPU $(DOSGL)/include/GL/gl.h"; do \
 	  [ -f "$${d#* }" ] || { echo "check-deps: no $${d%% *} checkout ($${d#* } is missing)"; exit 1; }; \
 	done
-# The pieces DOSBench uses from each, built in place.
+# The pieces DOSBench uses from it, built in place.
 deps: check-deps
-	$(Q)$(MAKE) -s -C $(MGA_GLIDE) build/gen/stamp build/ow/mgahal_exe.lib runtime dostools
+	$(Q)$(MAKE) -s -C $(RETROGPU) build/gen/stamp build/ow/mgahal_exe.lib runtime dostools
 	$(Q)$(MAKE) -s -C $(DOSGL) lib
 
-# ---- BENCHG.EXE: Open Watcom, DOS/4GW, Glide through MGA-Glide's loader --
+# ---- BENCHG.EXE: Open Watcom, DOS/4GW, Glide through MGA-Glide's loader (RetroGPU's tests/shim) --
 OWBIN := $(WATCOM)/binl64
 OWENV := env WATCOM=$(WATCOM) INCLUDE=$(WATCOM)/h PATH=$(OWBIN):$(PATH)
 WCC   := $(OWENV) $(OWBIN)/wcc386
 WLINK := $(OWENV) $(OWBIN)/wlink
 OW_CFLAGS := -bt=dos -mf -3s -fp5 -fpi87 -zri -ei -j -zastd=c99 -zq -we -wx -oxt \
-             -i=src/core -i=src/backend -i=$(MGA_GLIDE)/include -i=$(MGA_GLIDE)/hal/include \
-             -i=$(MGA_GLIDE)/build/gen -i=$(MGA_GLIDE)/tests/shim -i=build/gen -dMGA_OW=1 \
+             -i=src/core -i=src/backend -i=$(RETROGPU)/glide/include -i=$(RETROGPU)/hal/include \
+             -i=$(RETROGPU)/build/gen -i=$(RETROGPU)/tests/shim -i=build/gen -dMGA_OW=1 \
              -dDB_PROG="\"BENCHG\"" -dDB_BUILD_ID="\"$(BUILD_ID)\"" -dHX_BUILD_ID="\"$(BUILD_ID)\""
-SHIM_SRCS := $(MGA_GLIDE)/tests/shim/hx.c $(MGA_GLIDE)/tests/shim/leload.c $(MGA_GLIDE)/tests/shim/glbind.c \
-             $(MGA_GLIDE)/build/gen/glapi_names.c
+SHIM_SRCS := $(RETROGPU)/tests/shim/hx.c $(RETROGPU)/tests/shim/leload.c $(RETROGPU)/tests/shim/glbind.c \
+             $(RETROGPU)/build/gen/glapi_names.c
 G_OBJS := $(patsubst %.c,build/ow/%.obj,$(CORE_SRCS) src/backend/rb_glide.c src/backend/gtex.c) \
-          $(patsubst $(MGA_GLIDE)/%.c,build/ow/mga/%.obj,$(SHIM_SRCS))
+          $(patsubst $(RETROGPU)/%.c,build/ow/mga/%.obj,$(SHIM_SRCS))
 
 build/ow/%.obj: %.c | deps
 	@mkdir -p $(dir $@)
 	$(Q)echo "  WCC     $<"
 	$(Q)$(WCC) $(OW_CFLAGS) -ad=$(@:.obj=.d) -adt=$@ -add=$< -adfs -fo=$@ $<
-build/ow/mga/%.obj: $(MGA_GLIDE)/%.c | deps
+build/ow/mga/%.obj: $(RETROGPU)/%.c | deps
 	@mkdir -p $(dir $@)
 	$(Q)echo "  WCC     $(notdir $<)"
 	$(Q)$(WCC) $(OW_CFLAGS) -ad=$(@:.obj=.d) -adt=$@ -add=$< -adfs -fo=$@ $<
 -include $(shell find build/ow -name '*.d' 2>/dev/null)
 
-build/dos/BENCHG.EXE: $(G_OBJS) $(MGA_GLIDE)/build/ow/mgahal_exe.lib
+build/dos/BENCHG.EXE: $(G_OBJS) $(RETROGPU)/build/ow/mgahal_exe.lib
 	@mkdir -p $(dir $@)
 	$(Q)echo "  WLINK   $@"
 	$(Q)$(WLINK) system dos4g option quiet option stack=128k name $@ $(addprefix file ,$(G_OBJS)) \
-	  library $(MGA_GLIDE)/build/ow/mgahal_exe.lib option map=$(@:.EXE=.map)
+	  library $(RETROGPU)/build/ow/mgahal_exe.lib option map=$(@:.EXE=.map)
 
 # ---- BENCHGL.EXE and DBMENU.EXE: DJGPP, CWSDPMI, DOS-GL's libGL.a ---------
 DJENV := env LD_LIBRARY_PATH=$(DJGPP_PREFIX)/hostlib
@@ -97,7 +101,7 @@ build/dos/DBMENU.EXE: src/menu/menu.c build/gen/registry.h src/core/version.h
 
 # ---- Host unit tests ------------------------------------------------------
 HOST_CFLAGS := -std=gnu99 -O1 -g -Wall -Wextra -Werror -Isrc/core -Isrc/backend -Itests/host -Ibuild/gen \
-               -I$(MGA_GLIDE)/include
+               -I$(RETROGPU)/glide/include
 UNIT_TESTS := stats vmath clip tex timer scene select score gs
 UNIT_stats := src/core/stats.c
 UNIT_vmath := src/core/vmath.c

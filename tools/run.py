@@ -2,7 +2,7 @@
 """DOSBench runner.
 
   run.py loopa [--card g450[,g400,g200]] [--tests LIST] [--no-ref] [--full]
-      One 86Box VM per card (MGA-Glide's Loop A harness, the emulated Matrox
+      One 86Box VM per card (RetroGPU's Loop A harness, the emulated Matrox
       card plus the emulated Voodoo Graphics) runs, in one job:
         BENCHGL.EXE                                 OpenGL on DOS-GL      (tag L)
         BENCHG.EXE --glide=C:\\TEST\\GLIDE2X.OVL      Glide on MGA-Glide    (tag G)
@@ -13,14 +13,14 @@
       says nothing about real hardware: numbers come from the bench.
 
   run.py bench --pc NAME [--tests LIST] [--modes ...] [--install-data]
-      A bench job (MGA-Glide's tools/bench/run.py): both programs back to back
-      on a real PC; results land in MGA-Glide's out/bench/<pc>/<job>/files/.
+      A bench job (RetroGPU's tools/bench/run.py): both programs back to back
+      on a real PC; results land in RetroGPU's out/bench/<pc>/<job>/files/.
       --install-data first copies the scenes to C:\\DOSBENCH\\DATA (once per PC).
 
   run.py winvm [--card g450] [--games]
       A ready-to-boot 86Box machine (dist/dosbench-<card>-vm.zip) with DOSBench,
-      DOS-GL's demos and ClassiCube, for MGA-Glide's patched 86Box, including
-      its Windows build (MGA-Glide tools/86box/windows/). --games adds the
+      DOS-GL's demos and ClassiCube, for RetroGPU's patched 86Box, including
+      its Windows build (RetroGPU tools/86box/windows/). --games adds the
       owner's games from the local fixtures (a private zip): GTA and Screamer
       Rally on C:, and on a second disk D: Quake, LibreQuake and Quake 2 in
       DOS-GL's builds (DOS-GL: make quake).
@@ -54,7 +54,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def make_vars():
-    """MGA_GLIDE and DOSGL as the Makefile sees them (config.mk, config.local.mk, environment)."""
+    """RETROGPU as the Makefile sees it (config.mk, config.local.mk, environment), and from it MGA_GLIDE
+    (the harness, the HAL and Glide: RetroGPU's root) and DOSGL (its gl/)."""
     vals = {"HOME": os.path.expanduser("~")}
     for name in ("config.mk", "config.local.mk"):
         path = os.path.join(ROOT, name)
@@ -67,9 +68,12 @@ def make_vars():
                 if "?=" in line and m.group(1) in vals and m.group(1) != "HOME":
                     continue
                 vals[m.group(1)] = val
-    for k in ("MGA_GLIDE", "DOSGL", "FIFTHWHEEL", "ECHOES"):
+    for k in ("RETROGPU", "FIFTHWHEEL", "ECHOES"):
         if os.environ.get(k):
             vals[k] = os.environ[k]
+    vals.setdefault("RETROGPU", os.path.join(vals["HOME"], "RetroGPU"))
+    vals["MGA_GLIDE"] = vals["RETROGPU"]
+    vals["DOSGL"] = os.path.join(vals["RETROGPU"], "gl")
     return vals
 
 
@@ -681,7 +685,7 @@ def cmd_compare(a):
 
 
 def cmd_bench(a):
-    """A bench job through MGA-Glide's tools/bench/run.py: both programs back to
+    """A bench job through RetroGPU's tools/bench/run.py: both programs back to
     back (OpenGL, then Glide on the job's GLIDE2X.OVL), results uploaded from
     C:\\OUT. --install-data instead copies the scenes to C:\\DOSBENCH\\DATA once."""
     bench = [sys.executable, os.path.join(MGA, "tools", "bench", "run.py"), "--pc", a.pc,
@@ -805,7 +809,7 @@ def quake_disk(dosgl, stage):
 
 def cmd_winvm(a):
     """A ready-to-boot 86Box machine with DOSBench, DOS-GL's demos and
-    ClassiCube, for MGA-Glide's patched 86Box (Windows kit or Linux)."""
+    ClassiCube, for RetroGPU's patched 86Box (Windows kit or Linux)."""
     dosgl = VARS["DOSGL"]
     name = "dosbench-" + a.card + ("-games" if a.games else "")
     files = ["%s=/DOSBENCH/%s" % (os.path.join(ROOT, "build/dos", f), f)
@@ -823,7 +827,7 @@ def cmd_winvm(a):
     if os.path.exists(cc):
         files += ["%s=/CC/CCDOS.EXE" % cc,
                   "%s=/CC/TEXPACKS/DEFAULT.ZIP" % os.path.join(dosgl, "build/cc/default.zip")]
-    # The dev container mounts MGA-Glide and this repository only: stage the rest here.
+    # The dev container mounts RetroGPU and this repository only: stage the rest here.
     stage = os.path.join(ROOT, "build", "winvm")
     shutil.rmtree(stage, ignore_errors=True)
     os.makedirs(stage)
@@ -846,7 +850,7 @@ def cmd_winvm(a):
     for f in files:
         cmd += ["--file", f]
     if a.games:
-        # Retail games from MGA-Glide's local fixtures: this zip is for the owner's machine only.
+        # Retail games from the platform's local fixtures: this zip is for the owner's machine only.
         cmd += ["--game", "gta", "--game", "sr", "--mga-ovl", os.path.join(MGA, "build/ow/GLIDE2X.OVL")] + quake
     return subprocess.run(cmd, cwd=ROOT).returncode
 
