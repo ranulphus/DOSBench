@@ -637,6 +637,15 @@ def game_results(out):
     return recs
 
 
+def game_records(recs, tid, t):
+    """A game test's T records: the name the game is told to write (-dbtest or td_dbtest in its args; else the
+    test's ID), and that name's pieces, NAME-something (FW3's FW3-couple, -town, -dock; FWP's FWP-<tris>-<path>;
+    ECHPL's ECHP-LOW), in RESULTS.TXT's order."""
+    m = re.search(r"(?:-dbtest|td_dbtest)\s+(\S+)", t.get("args", ""))
+    name = m.group(1) if m else tid
+    return [(k, v) for k, v in recs.items() if k == name or k.startswith(name + "-")]
+
+
 def cmd_games(a):
     cat = game_catalogue(a.tests)
     cards = a.card.split(",")
@@ -655,11 +664,15 @@ def cmd_games(a):
             dirs.setdefault(key, []).append(out)
             recs = game_results(out)
             for tid in tests:
-                r = recs.get(tid)
-                st = r.get("status", "?") if r else "MISSING"
-                ok = ok and st == "ok"
-                print("  %-5s %-6s %-7s %s" % (card, tid, st, "fps=%s frames=%s crc=%s" % (r["fps"], r["frames"], r["crc"])
-                                                               if r else ""))
+                mine = game_records(recs, tid, tests[tid])
+                if not mine:
+                    ok = False
+                    print("  %-5s %-6s %-7s" % (card, tid, "MISSING"))
+                for name, r in mine:
+                    st = r.get("status", "?")
+                    ok = ok and st == "ok"
+                    print("  %-5s %-6s %-7s %s" % (card, name if name != tid else tid, st,
+                                                   "fps=%s frames=%s crc=%s" % (r.get("fps"), r.get("frames"), r.get("crc"))))
     results = []
     for key, kd in dirs.items():
         for d in kd:                                     # variants against their plain runs
