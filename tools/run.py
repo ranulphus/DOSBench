@@ -536,7 +536,8 @@ def games_job(card, key, tests, a):
 # on C:\TEST (and the optional ones), and how to build them.
 DGK_GAMES = {
     "fifthwheel": ("FIFTHWHEEL", "~/FifthWheel", ("build/dos/FWHEEL.EXE", "build/data/WORLD.PAK"),
-                   (("build/data/budget.cfg", "BUDGET.CFG"),), "Fifth Wheel: make dos"),
+                   (("build/data/budget.cfg", "BUDGET.CFG"), ("build/data/WORLDHI.PAK", "WORLDHI.PAK")),
+                   "Fifth Wheel: make dos"),
     "echoes": ("ECHOES", "~/Frontier", ("build/dos/ECHOES.EXE",), (), "Echoes of the Void: make dos"),
 }
 
@@ -547,7 +548,8 @@ def fw_job(card, tests, a, key="fifthwheel"):
     times 3,000 frames of Fifth Wheel's autopilot driving its generated world
     (FW1L at the LOW detail preset, FW1H at HIGH with the camera pulled right
     back); FWP is its performance probe; BUDGET.CFG, the presets' numbers,
-    goes beside it when the build has one. ECH1 times Echoes of the Void's
+    goes beside it when the build has one, and WORLDHI.PAK, HIGH's textured
+    world (FW main 19a566c on: without it FW1H and FW3H draw HIGH untextured). ECH1 times Echoes of the Void's
     paced descent from orbit to the ground. The games write their own H and
     T lines (dgk/bench.h)."""
     var, default, need, optional, how = DGK_GAMES[key]
@@ -562,7 +564,7 @@ def fw_job(card, tests, a, key="fifthwheel"):
         shutil.copyfile(src, os.path.join(q, name))
         files.append("%s=/TEST/%s" % (os.path.join(q, name), name))
     out = os.path.join(ROOT, "out", "games", card, key)
-    for rel, name in optional:                                  # (the detail presets' numbers)
+    for rel, name in optional:                                  # (the presets' numbers, HIGH's textured world)
         if os.path.exists(os.path.join(src_dir, rel)):
             shutil.copyfile(os.path.join(src_dir, rel), os.path.join(q, name))
             files.append("%s=/TEST/%s" % (os.path.join(q, name), name))
