@@ -617,7 +617,11 @@ def doom_job(card, tests, a):
     cmd = [os.path.join(MGA, "tools", "dev"), "python3", os.path.join(MGA, "tools", "loopa", "run.py"),
            "--name", "dosbench-doom-%s" % card, "--card", card, "--out", out,
            "--games-file", gfile, "--game", "doom", "--pre", "SET DOOM_SERIAL=1", "--pre", "SET LFN=n",
-           "--pre", "SET DGL_VSYNC=0", "--timeout", str(a.timeout), "--idle", str(a.idle)]
+           "--pre", "SET DGL_VSYNC=0",
+           # (PrBoom-plus's own defaults are 32-bit colour and Z24, which DOS-GL gives since RetroGPU's texcopy
+           # merge where the card draws them: these tests stay at the 16 bits their earlier numbers were made at;
+           # the owner, 2026-11-28)
+           "--pre", "SET DGL_COLOR_BITS=16", "--timeout", str(a.timeout), "--idle", str(a.idle)]
     for f in files:
         cmd += ["--file", f]
     for c in cmds:
